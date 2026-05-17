@@ -1,0 +1,88 @@
+FROM kalilinux/kali-rolling AS base
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
+
+# ── System tools disponibles en Kali vía apt ──────────────────────────────────
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    whois \
+    dnsutils \
+    python3 \
+    python3-pip \
+    python3-venv \
+    python3-dev \
+    git \
+    curl \
+    wget \
+    libimage-exiftool-perl \
+    mat2 \
+    poppler-utils \
+    file \
+    binutils \
+    ca-certificates \
+    whatweb \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+# ── Herramientas OSINT disponibles en repos de Kali (opcionales) ─────────────
+# Si no están en el repo se ignoran — el runner las omite gracefully
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    subfinder 2>/dev/null || true && \
+    rm -rf /var/lib/apt/lists/*
+
+# ── Python virtual environment ────────────────────────────────────────────────
+RUN python3 -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel
+
+# ── Project dependencies (incluye mcp, fastapi, httpx Python lib, etc.) ───────
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# ── Herramientas OSINT Python — cada una en capa separada para cache óptimo ───
+# sherlock y maigret (búsqueda de usernames)
+RUN pip install --no-cache-dir sherlock-project maigret || \
+    echo "WARNING: sherlock/maigret install failed — username_recon degraded"
+
+# holehe (email service check)
+RUN pip install --no-cache-dir holehe || \
+    echo "WARNING: holehe install failed — email_reputation degraded"
+
+# theHarvester (domain/email OSINT)
+RUN pip install --no-cache-dir theHarvester || \
+    echo "WARNING: theHarvester install failed — domain_recon degraded"
+
+# gitleaks y trufflehog (secret detection)
+# gitleaks es un binario Go — intentar desde pip wrapper o skip
+RUN pip install --no-cache-dir trufflehog 2>/dev/null || \
+    echo "WARNING: trufflehog install failed — breach_workflow degraded"
+
+# ── Go-based tools (httpx CLI y phoneinfoga) via descarga de binarios ─────────
+RUN apt-get update && apt-get install -y --no-install-recommends unzip 2>/dev/null; \
+    curl -sL "https://github.com/projectdiscovery/httpx/releases/latest/download/httpx_linux_amd64.zip" \
+    -o /tmp/httpx.zip 2>/dev/null && \
+    cd /tmp && unzip -q httpx.zip httpx 2>/dev/null && \
+    mv /tmp/httpx /usr/local/bin/httpx && \
+    chmod +x /usr/local/bin/httpx && \
+    rm -f /tmp/httpx.zip && \
+    rm -rf /var/lib/apt/lists/* || \
+    echo "WARNING: httpx CLI install failed — web probing degraded"
+
+# ── Application code ──────────────────────────────────────────────────────────
+COPY mcp_server/ ./mcp_server/
+COPY osint_api/ ./osint_api/
+COPY config/ ./config/
+
+# ── Non-root user ─────────────────────────────────────────────────────────────
+RUN useradd -m -u 1000 osint && \
+    mkdir -p /tmp/osint-uploads /app/evidence /app/reports && \
+    chown -R osint:osint /tmp/osint-uploads /app/evidence /app/reports && \
+    chown -R osint:osint /app
+
+USER osint
+
+EXPOSE 8001
+CMD ["uvicorn", "osint_api.main:app", "--host", "0.0.0.0", "--port", "8001"]

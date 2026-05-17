@@ -1,0 +1,297 @@
+tools:
+  # ── Domain / DNS ──────────────────────────────────────────────────────────
+  - name: whois
+    category: domain
+    type: cli
+    binary: whois
+    enabled: true
+    requires_api_key: false
+    risk_level: low
+    description: WHOIS lookup for domains and IPs
+    inputs: [domain, ip]
+    outputs: [registrar, dates, nameservers, contacts]
+    parser: whois_parser
+    timeout: 30
+    allowed_args: ["-H", "-r", "-a"]
+
+  - name: dig
+    category: domain
+    type: cli
+    binary: dig
+    enabled: true
+    requires_api_key: false
+    risk_level: low
+    description: DNS record lookup
+    inputs: [domain]
+    outputs: [dns_records]
+    parser: dig_parser
+    timeout: 15
+    allowed_args: ["+short", "+noall", "+answer", "+nocmd", "ANY", "A", "AAAA", "MX", "NS", "TXT", "SOA", "CNAME", "PTR"]
+
+  - name: subfinder
+    category: domain
+    type: cli
+    binary: subfinder
+    enabled: true
+    requires_api_key: false
+    risk_level: low
+    description: Passive subdomain discovery
+    inputs: [domain]
+    outputs: [subdomains]
+    parser: subfinder_parser
+    timeout: 120
+    allowed_args: ["-d", "-silent", "-o", "-t", "-timeout", "-nW"]
+
+  - name: theHarvester
+    category: domain
+    type: cli
+    binary: theHarvester
+    enabled: true
+    requires_api_key: false
+    risk_level: low
+    description: OSINT gathering from public sources — emails, hosts, IPs
+    inputs: [domain, email]
+    outputs: [emails, hosts, ips]
+    parser: theharvester_parser
+    timeout: 120
+    allowed_args: ["-d", "-l", "-b", "-f", "-S", "-v"]
+
+  - name: httpx
+    category: domain
+    type: cli
+    binary: httpx
+    enabled: true
+    requires_api_key: false
+    risk_level: low
+    description: HTTP probing — status, title, server, technology detection
+    inputs: [domain, url]
+    outputs: [status_code, title, server, technologies]
+    parser: httpx_parser
+    timeout: 60
+    allowed_args: ["-u", "-silent", "-title", "-status-code", "-tech-detect", "-web-server", "-follow-redirects", "-timeout"]
+
+  - name: whatweb
+    category: domain
+    type: cli
+    binary: whatweb
+    enabled: true
+    requires_api_key: false
+    risk_level: low
+    description: Web technology fingerprinting
+    inputs: [url]
+    outputs: [technologies, cms, frameworks]
+    parser: whatweb_parser
+    timeout: 30
+    allowed_args: ["--log-brief", "--no-errors", "--quiet", "-a"]
+
+  # ── IP / ASN ───────────────────────────────────────────────────────────────
+  - name: abuseipdb
+    category: ip
+    type: api
+    enabled: true
+    requires_api_key: true
+    risk_level: low
+    description: AbuseIPDB reputation check
+    inputs: [ip]
+    outputs: [abuse_reports, confidence_score, isp, country]
+    parser: abuseipdb_parser
+    timeout: 15
+    allowed_args: []
+
+  - name: shodan
+    category: ip
+    type: api
+    enabled: false
+    requires_api_key: true
+    risk_level: medium
+    description: Shodan passive service discovery
+    inputs: [ip, domain]
+    outputs: [open_ports, banners, vulnerabilities]
+    parser: shodan_parser
+    timeout: 30
+    allowed_args: []
+
+  # ── Email ──────────────────────────────────────────────────────────────────
+  - name: holehe
+    category: email
+    type: cli
+    binary: holehe
+    enabled: true
+    requires_api_key: false
+    risk_level: low
+    description: Check email registration on online services (no login, no password)
+    inputs: [email]
+    outputs: [services, registered_count]
+    parser: holehe_parser
+    timeout: 120
+    allowed_args: ["--no-color", "--only-used", "--timeout"]
+
+  - name: emailrep
+    category: email
+    type: api
+    enabled: true
+    requires_api_key: true
+    risk_level: low
+    description: EmailRep.io reputation API
+    inputs: [email]
+    outputs: [reputation, suspicious, references, profiles]
+    parser: emailrep_parser
+    timeout: 15
+    allowed_args: []
+
+  - name: hibp
+    category: email
+    type: api
+    enabled: true
+    requires_api_key: true
+    risk_level: low
+    description: Have I Been Pwned breach check
+    inputs: [email]
+    outputs: [breaches, pastes]
+    parser: hibp_parser
+    timeout: 15
+    allowed_args: []
+
+  # ── Phone ──────────────────────────────────────────────────────────────────
+  - name: phoneinfoga
+    category: phone
+    type: cli
+    binary: phoneinfoga
+    enabled: true
+    requires_api_key: false
+    risk_level: medium
+    description: Phone number OSINT — carrier, line type, spam signals
+    inputs: [phone]
+    outputs: [carrier, line_type, country, spam_signals, public_mentions]
+    parser: phoneinfoga_parser
+    timeout: 60
+    allowed_args: ["scan", "-n", "--output", "--format"]
+
+  # ── Username / Identity ────────────────────────────────────────────────────
+  - name: sherlock
+    category: username
+    type: cli
+    binary: sherlock
+    enabled: true
+    requires_api_key: false
+    risk_level: low
+    description: Username search across social networks
+    inputs: [username]
+    outputs: [profiles, urls, confidence]
+    parser: sherlock_parser
+    timeout: 180
+    allowed_args: ["--timeout", "--print-found", "--no-color", "--csv", "--folderoutput", "--site"]
+
+  - name: maigret
+    category: username
+    type: cli
+    binary: maigret
+    enabled: true
+    requires_api_key: false
+    risk_level: low
+    description: Advanced username OSINT with profile aggregation
+    inputs: [username]
+    outputs: [profiles, urls, tags, confidence]
+    parser: maigret_parser
+    timeout: 180
+    allowed_args: ["--timeout", "--no-color", "-a", "--json", "--folderoutput", "--site", "--top-sites"]
+
+  # ── Image ──────────────────────────────────────────────────────────────────
+  - name: exiftool
+    category: image
+    type: cli
+    binary: exiftool
+    enabled: true
+    requires_api_key: false
+    risk_level: low
+    description: Extract metadata from images and documents
+    inputs: [filepath]
+    outputs: [gps, author, software, dates, camera, file_type]
+    parser: exiftool_parser
+    timeout: 30
+    allowed_args: ["-json", "-csv", "-n", "-q", "-s", "-GPS*", "-Author", "-CreateDate", "-ModifyDate", "-Software", "-FileType"]
+
+  # ── Metadata ───────────────────────────────────────────────────────────────
+  - name: mat2
+    category: metadata
+    type: cli
+    binary: mat2
+    enabled: true
+    requires_api_key: false
+    risk_level: low
+    description: Metadata analysis and removal
+    inputs: [filepath]
+    outputs: [metadata_fields, sanitized_path]
+    parser: mat2_parser
+    timeout: 30
+    allowed_args: ["--show", "--inplace", "--no-sandbox"]
+
+  - name: pdfinfo
+    category: metadata
+    type: cli
+    binary: pdfinfo
+    enabled: true
+    requires_api_key: false
+    risk_level: low
+    description: PDF metadata extraction
+    inputs: [filepath]
+    outputs: [author, creator, dates, encrypted, pages]
+    parser: pdfinfo_parser
+    timeout: 15
+    allowed_args: ["-meta", "-enc", "-l"]
+
+  - name: file
+    category: metadata
+    type: cli
+    binary: file
+    enabled: true
+    requires_api_key: false
+    risk_level: low
+    description: File type detection
+    inputs: [filepath]
+    outputs: [file_type, mime_type]
+    parser: file_parser
+    timeout: 10
+    allowed_args: ["-b", "-i", "--mime-type"]
+
+  # ── Breach / Leaks ─────────────────────────────────────────────────────────
+  - name: gitleaks
+    category: breach
+    type: cli
+    binary: gitleaks
+    enabled: true
+    requires_api_key: false
+    risk_level: medium
+    description: Detect secrets and credentials in git repos / filesystems
+    inputs: [filepath]
+    outputs: [secrets, rules_matched, files]
+    parser: gitleaks_parser
+    timeout: 120
+    allowed_args: ["detect", "--source", "--report-format", "--report-path", "--no-git", "--verbose"]
+
+  - name: trufflehog
+    category: breach
+    type: cli
+    binary: trufflehog
+    enabled: true
+    requires_api_key: false
+    risk_level: medium
+    description: Find credentials and secrets using entropy analysis
+    inputs: [filepath, git_url]
+    outputs: [secrets, detector_name, verified]
+    parser: trufflehog_parser
+    timeout: 120
+    allowed_args: ["filesystem", "git", "--json", "--no-update", "--concurrency", "--only-verified"]
+
+  - name: virustotal
+    category: breach
+    type: api
+    enabled: true
+    requires_api_key: true
+    risk_level: low
+    description: VirusTotal URL and domain reputation
+    inputs: [url, domain, ip, hash]
+    outputs: [malicious_count, reputation, last_analysis_date]
+    parser: virustotal_parser
+    timeout: 30
+    allowed_args: []

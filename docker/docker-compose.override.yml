@@ -1,0 +1,18 @@
+# Override para desarrollo: monta el código local en el contenedor
+# Los cambios en el host se reflejan inmediatamente (con restart)
+# Uso: docker compose -f docker/docker-compose.yml -f docker/docker-compose.override.yml up -d
+
+services:
+  osint-api:
+    read_only: false           # Permite escritura para desarrollo
+    volumes:
+      - ../osint_api:/app/osint_api:ro
+      - ../mcp_server:/app/mcp_server:ro
+      - ../config:/app/config:ro
+
+  mcp-server:
+    read_only: false
+    volumes:
+      - ../mcp_server:/app/mcp_server:ro
+      - ../osint_api:/app/osint_api:ro
+      - ../config:/app/config:ro

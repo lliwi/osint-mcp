@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls /home/llibert/.claude/plans/ 2>/dev/null && cat /home/llibert/.claude/projects/-home-llibert-Documents-development-osint-mcp/memory/MEMORY.md 2>/dev/null || echo \"No memory yet\")",
+      "Read(//home/llibert/.claude/plans/**)",
+      "Bash(docker info *)",
+      "Bash(docker build *)"
+    ]
+  }
+}

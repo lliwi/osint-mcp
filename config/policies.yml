@@ -1,0 +1,51 @@
+modes:
+  safe:
+    description: Default mode. Passive OSINT only, no raw commands, no aggressive scraping.
+    allowed_workflows:
+      - domain_recon
+      - ip_reputation
+      - email_reputation
+      - phone_reputation
+      - username_recon
+      - reverse_image_search
+      - metadata_analysis
+      - breach_exposure_check
+      - social_profile_discovery
+      - list_osint_tools
+      - recommend_osint_workflow
+      - run_osint_workflow
+      - get_task_result
+      - export_report
+    blocked_tools:
+      - nmap
+      - sqlmap
+    max_task_seconds: 300
+    max_concurrent_tasks: 3
+
+  analyst:
+    description: Advanced analyst mode. Requires authentication. More sources and APIs.
+    allowed_workflows: "*"
+    blocked_tools: []
+    max_task_seconds: 600
+    max_concurrent_tasks: 5
+
+  lab:
+    description: Internal lab mode. Not exposed to internet. Testing only.
+    allowed_workflows: "*"
+    blocked_tools: []
+    max_task_seconds: 900
+    max_concurrent_tasks: 10
+    allow_raw_commands: true
+
+rate_limits:
+  workflow_requests_per_minute: 10
+  api_requests_per_minute: 5
+  max_result_size_mb: 10
+  max_file_upload_mb: 50
+
+privacy:
+  mask_email_in_output: true
+  mask_phone_in_output: true
+  show_full_passwords: false
+  show_full_hashes: false
+  evidence_retention_days: 30
