@@ -1,0 +1,22 @@
+[
+  {
+    "task_id": "810bc73e-930f-4cc1-807c-80a4b0aa3d62",
+    "workflow": "domain_recon",
+    "target": "euroleaguebasketball.net"
+  },
+  {
+    "task_id": "40d49aee-2b4f-49e3-8a61-8d9310af2303",
+    "workflow": "domain_recon",
+    "target": "wikipedia.org"
+  },
+  {
+    "task_id": "a555b5ef-ec4c-4b81-84ae-e4e7060db7c9",
+    "workflow": "domain_recon",
+    "target": "playingwith.info"
+  },
+  {
+    "task_id": "86f437b0-3d6b-40fc-bc3f-bb197ffad563",
+    "workflow": "domain_recon",
+    "target": "cloudflare.com"
+  }
+]
