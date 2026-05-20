@@ -1,0 +1,412 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "OSINT MCP Server",
+    "description": "API for passive OSINT intelligence gathering. Supports reconnaissance of domains, IPs, emails, phone numbers, usernames, files, and breach exposure checks. All analysis uses public sources only. No active exploitation, no credential attacks, no privacy violations.\n\nHow to use:\n1. Call POST /workflow/run with the workflow name and target. You get a task_id.\n2. Poll GET /tasks/{task_id} until status is completed or failed.\n3. Optionally call POST /reports/{task_id} to get a formatted Markdown report.\n\nAvailable workflows:\n- domain_recon: WHOIS, DNS, subdomains, technologies\n- ip_reputation: ASN, abuse reports, passive services\n- email_reputation: service registrations, reputation, breach exposure\n- phone_reputation: carrier, line type, spam signals\n- username_recon: public profiles across social networks\n- reverse_image_search: EXIF metadata, image hash\n- metadata_analysis: file metadata and privacy risks\n- breach_exposure_check: known data breaches",
+    "version": "0.1.0"
+  },
+  "servers": [
+    {
+      "url": "https://osint-mcp.playingwith.info",
+      "description": "OSINT API"
+    }
+  ],
+  "security": [
+    {
+      "ApiKeyAuth": []
+    }
+  ],
+  "paths": {
+    "/health": {
+      "get": {
+        "operationId": "healthCheck",
+        "summary": "Check API health",
+        "description": "Returns the API status and current operation mode.",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Service is healthy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tools": {
+      "get": {
+        "operationId": "listOsintTools",
+        "summary": "List available OSINT tools",
+        "description": "Returns the catalog of available OSINT tools.",
+        "parameters": [
+          {
+            "name": "category",
+            "in": "query",
+            "required": false,
+            "description": "Filter by category: domain, ip, email, phone, username, image, metadata, breach, or all",
+            "schema": {
+              "type": "string",
+              "default": "all",
+              "enum": ["all", "domain", "ip", "email", "phone", "username", "image", "metadata", "breach"]
+            }
+          },
+          {
+            "name": "enabled_only",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": true
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of OSINT tools",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/OsintTool"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workflow/run": {
+      "post": {
+        "operationId": "runOsintWorkflow",
+        "summary": "Launch an OSINT workflow",
+        "description": "Starts an OSINT analysis asynchronously. Returns a task_id immediately. Then poll GET /tasks/{task_id} until status is completed. Select the workflow by indicator type: email -> email_reputation, domain -> domain_recon, IP -> ip_reputation, phone -> phone_reputation, username -> username_recon, breach check -> breach_exposure_check.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WorkflowRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Workflow accepted. Poll /tasks/{task_id} for the result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkflowSubmitResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          }
+        }
+      }
+    },
+    "/tasks/{task_id}": {
+      "get": {
+        "operationId": "getTaskResult",
+        "summary": "Get workflow result",
+        "description": "Returns the current status and result of a workflow. Poll every 3-5 seconds until status is completed, failed, or partial. Typical workflow takes 5-30 seconds.",
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "description": "The task_id returned by POST /workflow/run",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Task status and result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Task not found"
+          }
+        }
+      }
+    },
+    "/reports/{task_id}": {
+      "post": {
+        "operationId": "generateReport",
+        "summary": "Generate a formatted OSINT report",
+        "description": "Generates a formatted report for a completed task. Use format=markdown for readable output. Only call after status is completed.",
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReportRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Formatted report as plain text",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Task not found"
+          },
+          "409": {
+            "description": "Task not yet completed"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "ApiKeyAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-OSINT-API-Key"
+      }
+    },
+    "schemas": {
+      "HealthResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "ok or error"
+          },
+          "mode": {
+            "type": "string",
+            "description": "Current operation mode: safe, analyst, or lab"
+          }
+        }
+      },
+      "OsintTool": {
+        "type": "object",
+        "required": ["name", "category", "type"],
+        "properties": {
+          "name": {"type": "string"},
+          "category": {"type": "string"},
+          "type": {"type": "string"},
+          "enabled": {"type": "boolean"},
+          "requires_api_key": {"type": "boolean"},
+          "risk_level": {"type": "string"},
+          "description": {"type": "string"},
+          "inputs": {"type": "array", "items": {"type": "string"}},
+          "outputs": {"type": "array", "items": {"type": "string"}}
+        }
+      },
+      "WorkflowRequest": {
+        "type": "object",
+        "required": ["workflow", "target"],
+        "properties": {
+          "workflow": {
+            "type": "string",
+            "enum": [
+              "domain_recon",
+              "ip_reputation",
+              "email_reputation",
+              "phone_reputation",
+              "username_recon",
+              "reverse_image_search",
+              "metadata_analysis",
+              "breach_exposure_check"
+            ],
+            "description": "The OSINT workflow to execute"
+          },
+          "target": {
+            "type": "string",
+            "description": "The indicator to analyze: domain, IP, email, phone number, username, filename, or URL"
+          },
+          "mode": {
+            "type": "string",
+            "enum": ["safe", "analyst"],
+            "default": "safe",
+            "description": "Operation mode. Always use safe."
+          },
+          "output_format": {
+            "type": "string",
+            "enum": ["json", "markdown"],
+            "default": "json"
+          },
+          "options": {
+            "type": "object",
+            "description": "Optional workflow parameters: depth (quick/standard/deep for domain_recon), country_hint (ISO code for phone_reputation), indicator_type (auto/email/domain/url for breach_exposure_check), platform_scope (all or specific platform for username_recon)",
+            "additionalProperties": true
+          }
+        }
+      },
+      "WorkflowSubmitResponse": {
+        "type": "object",
+        "required": ["task_id", "status"],
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "description": "Unique task identifier. Use this to poll for results with GET /tasks/{task_id}."
+          },
+          "status": {
+            "type": "string",
+            "description": "Always running immediately after submission"
+          }
+        }
+      },
+      "TaskResponse": {
+        "type": "object",
+        "required": ["task_id", "workflow", "target", "status"],
+        "properties": {
+          "task_id": {"type": "string"},
+          "workflow": {"type": "string"},
+          "target": {"type": "string"},
+          "status": {
+            "type": "string",
+            "enum": ["running", "completed", "failed", "partial"],
+            "description": "Poll until completed or failed"
+          },
+          "started_at": {"type": "string"},
+          "finished_at": {
+            "type": "string",
+            "nullable": true
+          },
+          "error": {
+            "type": "string",
+            "description": "Error message if status is failed"
+          },
+          "result": {
+            "$ref": "#/components/schemas/OsintResult"
+          }
+        }
+      },
+      "OsintResult": {
+        "type": "object",
+        "description": "Normalized OSINT result. Present when status is completed or partial.",
+        "properties": {
+          "task_id": {"type": "string"},
+          "workflow": {"type": "string"},
+          "status": {"type": "string"},
+          "target": {"type": "string"},
+          "target_type": {"type": "string"},
+          "summary": {
+            "type": "string",
+            "description": "Executive summary of the analysis"
+          },
+          "findings": {
+            "type": "array",
+            "description": "Individual findings with type, value, source and confidence",
+            "items": {
+              "$ref": "#/components/schemas/Finding"
+            }
+          },
+          "sources": {
+            "type": "array",
+            "description": "Data sources queried",
+            "items": {
+              "$ref": "#/components/schemas/Source"
+            }
+          },
+          "confidence": {
+            "type": "string",
+            "enum": ["low", "medium", "high", "unknown"]
+          },
+          "risk": {
+            "type": "string",
+            "enum": ["low", "medium", "high", "unknown"]
+          },
+          "warnings": {
+            "type": "array",
+            "items": {"type": "string"}
+          },
+          "started_at": {"type": "string"},
+          "finished_at": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "Finding": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "description": "Finding category, e.g. dns_a, whois_registrar, breach_count"
+          },
+          "value": {
+            "type": "string",
+            "description": "The finding value serialized as string or JSON"
+          },
+          "source": {
+            "type": "string",
+            "description": "Tool or API that produced this finding"
+          },
+          "confidence": {
+            "type": "string",
+            "enum": ["low", "medium", "high", "unknown"]
+          },
+          "notes": {"type": "string"}
+        }
+      },
+      "Source": {
+        "type": "object",
+        "properties": {
+          "name": {"type": "string"},
+          "url": {"type": "string"},
+          "queried_at": {"type": "string"},
+          "success": {"type": "boolean"}
+        }
+      },
+      "ReportRequest": {
+        "type": "object",
+        "required": ["task_id"],
+        "properties": {
+          "task_id": {"type": "string"},
+          "format": {
+            "type": "string",
+            "enum": ["markdown", "json", "html"],
+            "default": "markdown",
+            "description": "Use markdown for readable output in ChatGPT"
+          }
+        }
+      }
+    }
+  }
+}

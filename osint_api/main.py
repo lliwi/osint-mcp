@@ -9,6 +9,7 @@ import os
 from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI, HTTPException, Request, Security
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security.api_key import APIKeyHeader
 from pydantic import BaseModel
 
@@ -47,6 +48,16 @@ app = FastAPI(
     description="Backend API for the MCP OSINT Server",
     version="0.1.0",
     lifespan=lifespan,
+)
+
+# CORS — needed for GPT Actions and browser-based clients
+_cors_origins = os.getenv("CORS_ORIGINS", "*").split(",")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=_cors_origins,
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["X-OSINT-API-Key", "Content-Type", "Accept"],
 )
 
 
