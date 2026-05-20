@@ -14,7 +14,7 @@ TOOL_ALLOWLIST: dict[str, dict] = {
     "dig": {
         "binary": "dig",
         "allowed_flags": ["+short", "+noall", "+answer", "+nocmd", "ANY", "A", "AAAA",
-                          "MX", "NS", "TXT", "SOA", "CNAME", "PTR"],
+                          "MX", "NS", "TXT", "SOA", "CNAME", "PTR", "-x"],
         "positional_validators": ["domain_or_ip"],
         "timeout": 15,
     },
