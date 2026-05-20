@@ -129,19 +129,44 @@ pytest tests/ -v
 
 ## Variables de entorno
 
+### Configuración del sistema
+
 | Variable | Descripción | Por defecto |
 |---|---|---|
 | `OSINT_MODE` | Modo de operación: `safe`, `analyst`, `lab` | `safe` |
-| `OSINT_INTERNAL_API_KEY` | Clave compartida entre MCP server y OSINT API | `changeme` |
-| `LOG_LEVEL` | Nivel de log | `INFO` |
+| `OSINT_INTERNAL_API_KEY` | Clave compartida MCP server ↔ OSINT API (genera un UUID) | `changeme` |
+| `LOG_LEVEL` | Nivel de log: DEBUG, INFO, WARNING, ERROR | `INFO` |
 | `MAX_TASK_TIME_SECONDS` | Timeout máximo por tarea | `300` |
 | `MAX_CONCURRENT_TASKS` | Tareas concurrentes máximas | `3` |
-| `SHODAN_API_KEY` | API Key de Shodan (opcional) | — |
-| `ABUSEIPDB_API_KEY` | API Key de AbuseIPDB (opcional) | — |
-| `HIBP_API_KEY` | API Key de Have I Been Pwned (opcional) | — |
-| `VIRUSTOTAL_API_KEY` | API Key de VirusTotal (opcional) | — |
-| `EMAILREP_API_KEY` | API Key de EmailRep (opcional) | — |
-| `TINEYE_API_KEY` | API Key de TinEye (opcional) | — |
+
+### Modelos LLM (para el cliente)
+
+| Variable | Descripción | Dónde obtener la key |
+|---|---|---|
+| `OLLAMA_URL` | URL del servidor Ollama | — (local) |
+| `OLLAMA_MODEL` | Modelo por defecto | — |
+| `DEEPSEEK_API_KEY` | DeepSeek API (deepseek-chat / deepseek-reasoner) | [platform.deepseek.com](https://platform.deepseek.com/) |
+| `OPENAI_API_KEY` | OpenAI API (GPT-4o, GPT-4o-mini...) | [platform.openai.com/api-keys](https://platform.openai.com/api-keys) |
+
+### APIs externas OSINT
+
+Todas son opcionales. El sistema funciona con las que estén configuradas y degrada graciosamente las que faltan.
+
+| Variable | Servicio | Plan gratuito | Dónde obtener la key |
+|---|---|---|---|
+| `SHODAN_API_KEY` | Shodan — passive service discovery por IP | No (desde $49/mes) | [account.shodan.io](https://account.shodan.io/) |
+| `CENSYS_API_TOKEN` | Censys — hosts, certificados, dominios | Sí (250 req/mes) | [search.censys.io/account](https://search.censys.io/account) |
+| `VIRUSTOTAL_API_KEY` | VirusTotal — reputación de URLs, dominios, IPs, hashes | Sí (500 req/día) | [virustotal.com/gui/my-apikey](https://www.virustotal.com/gui/my-apikey) |
+| `ABUSEIPDB_API_KEY` | AbuseIPDB — reportes de abuso por IP | Sí (1000 req/día) | [abuseipdb.com/account/api](https://www.abuseipdb.com/account/api) |
+| `HIBP_API_KEY` | Have I Been Pwned — brechas por email | No (desde £3.50/mes) | [haveibeenpwned.com/API/Key](https://haveibeenpwned.com/API/Key) |
+| `EMAILREP_API_KEY` | EmailRep — reputación de email | Sí (limitado) | [emailrep.io/key](https://emailrep.io/key) |
+| `IPQUALITYSCORE_API_KEY` | IPQualityScore — fraud scoring para email, teléfono e IP | Sí (5000 req/mes) | [ipqualityscore.com/user/settings](https://www.ipqualityscore.com/user/settings) |
+| `FULLCONTACT_API_KEY` | FullContact — enriquecimiento de persona (nombre, empleo, perfiles sociales) | Sí (500 req/mes) | [dashboard.fullcontact.com](https://dashboard.fullcontact.com/) |
+| `INTELX_API_KEY` | Intelligence X — búsqueda en leaks, pastes, darkweb, Telegram | Sí (limitado) | [intelx.io](https://intelx.io/) → Account → API |
+| `SECURITYTRAILS_API_KEY` | SecurityTrails — DNS histórico, subdominios | Sí (50 req/mes) | [securitytrails.com/app/account/credentials](https://securitytrails.com/app/account/credentials) |
+| `TINEYE_API_KEY` | TinEye — búsqueda inversa de imágenes | No (desde $200/mes) | [api.tineye.com](https://api.tineye.com/) |
+| `NUMVERIFY_API_KEY` | Numverify — validación de teléfonos | Sí (100 req/mes) | [numverify.com/dashboard](https://numverify.com/dashboard) |
+| `TWILIO_ACCOUNT_SID` + `TWILIO_AUTH_TOKEN` | Twilio Lookup — carrier, tipo de línea | Pago por uso ($0.005/req) | [console.twilio.com](https://console.twilio.com/) |
 
 ---
 

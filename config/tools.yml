@@ -194,6 +194,32 @@ tools:
     allowed_args: ["scan", "-n", "--output", "--format"]
 
   # ── Username / Identity ────────────────────────────────────────────────────
+  - name: fullcontact
+    category: username
+    type: api
+    enabled: true
+    requires_api_key: true
+    risk_level: low
+    description: FullContact Person Enrichment — name, employment, social profiles, photo from email/phone/username
+    inputs: [email, phone, username]
+    outputs: [full_name, location, employment, social_profiles, associated_emails, bio, photo_url]
+    parser: fullcontact_parser
+    timeout: 15
+    allowed_args: []
+
+  - name: intelligencex
+    category: username
+    type: api
+    enabled: true
+    requires_api_key: true
+    risk_level: medium
+    description: Intelligence X — search leaks, pastes, darkweb, Telegram and public web for any indicator
+    inputs: [email, username, domain, ip, hash, phone]
+    outputs: [leak_mentions, paste_mentions, darkweb_mentions, source_type, preview]
+    parser: intelligencex_parser
+    timeout: 20
+    allowed_args: []
+
   - name: sherlock
     category: username
     type: cli

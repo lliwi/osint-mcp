@@ -3,7 +3,7 @@ from __future__ import annotations
 from mcp_server.schemas.common import (
     Confidence, Finding, OsintResult, Risk, Source, TargetType, TaskStatus,
 )
-from osint_api.connectors import emailrep, hibp, ipqualityscore
+from osint_api.connectors import emailrep, fullcontact, hibp, intelligencex, ipqualityscore
 from osint_api.parsers import holehe_parser
 from osint_api.runners.cli_runner import run_cli_tool
 from osint_api.security.sanitizer import mask_email
@@ -136,6 +136,43 @@ async def run(email: str) -> OsintResult:
                 type="breaches", value=hibp_data["breaches"],
                 source="HaveIBeenPwned", confidence=Confidence.high,
             ))
+
+    # ── FullContact (person enrichment) ──────────────────────────────────────
+    fc = await fullcontact.enrich_by_email(email)
+    if fc.get("available") and fc.get("found"):
+        result.sources.append(Source(name="FullContact", url="https://fullcontact.com"))
+        for field in ("full_name", "location", "age_range", "gender", "bio", "photo_url"):
+            if fc.get(field):
+                result.findings.append(Finding(
+                    type=field, value=fc[field], source="FullContact",
+                    confidence=Confidence.medium,
+                ))
+        if fc.get("employment"):
+            result.findings.append(Finding(
+                type="employment", value=fc["employment"],
+                source="FullContact", confidence=Confidence.medium,
+            ))
+        if fc.get("social_profiles"):
+            result.findings.append(Finding(
+                type="social_profiles", value=fc["social_profiles"],
+                source="FullContact", confidence=Confidence.high,
+            ))
+
+    # ── Intelligence X (leaks, pastes, darkweb) ───────────────────────────────
+    intelx = await intelligencex.search_leaks_only(email, max_results=10)
+    if intelx.get("available") and intelx.get("found"):
+        result.sources.append(Source(name="IntelligenceX", url="https://intelx.io"))
+        total = intelx.get("total_found", 0)
+        result.findings.append(Finding(
+            type="intelx_leak_mentions", value=intelx["results"],
+            source="IntelligenceX", confidence=Confidence.medium,
+            notes=f"{total} mentions in leak databases, pastes and darkweb",
+        ))
+        if result.risk == Risk.unknown:
+            result.risk = Risk.medium
+        result.warnings.append(
+            f"Email found in {total} source(s) on Intelligence X (leaks/pastes/darkweb)"
+        )
 
     _finalize(result)
     return result
