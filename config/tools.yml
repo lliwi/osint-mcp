@@ -126,6 +126,19 @@ tools:
     timeout: 120
     allowed_args: ["--no-color", "--only-used", "--timeout"]
 
+  - name: ipqualityscore_email
+    category: email
+    type: api
+    enabled: true
+    requires_api_key: true
+    risk_level: low
+    description: IPQualityScore email fraud scoring — disposable detection, spam traps, deliverability, breach exposure, fraud score
+    inputs: [email]
+    outputs: [fraud_score, valid, disposable, spam_trap, leaked, deliverability, dns_valid, overall_score]
+    parser: ipqualityscore_parser
+    timeout: 15
+    allowed_args: []
+
   - name: emailrep
     category: email
     type: api
@@ -153,6 +166,19 @@ tools:
     allowed_args: []
 
   # ── Phone ──────────────────────────────────────────────────────────────────
+  - name: ipqualityscore_phone
+    category: phone
+    type: api
+    enabled: true
+    requires_api_key: true
+    risk_level: low
+    description: IPQualityScore phone fraud scoring — carrier, line type, spam signals, fraud score, leaked status
+    inputs: [phone]
+    outputs: [fraud_score, valid, carrier, line_type, country, spammer, leaked, risky, do_not_call, owner_name]
+    parser: ipqualityscore_parser
+    timeout: 15
+    allowed_args: []
+
   - name: phoneinfoga
     category: phone
     type: cli

@@ -3,8 +3,8 @@ from __future__ import annotations
 from mcp_server.schemas.common import (
     Confidence, Finding, OsintResult, Risk, Source, TargetType, TaskStatus,
 )
-from osint_api.connectors import emailrep, hibp
-from osint_api.parsers import holehe_parser, theharvester_parser
+from osint_api.connectors import emailrep, hibp, ipqualityscore
+from osint_api.parsers import holehe_parser
 from osint_api.runners.cli_runner import run_cli_tool
 from osint_api.security.sanitizer import mask_email
 from osint_api.security.validator import validate_email
@@ -14,7 +14,7 @@ async def run(email: str) -> OsintResult:
     email = validate_email(email)
     result = OsintResult(
         workflow="email_reputation",
-        target=mask_email(email),  # mask in output; use raw value for queries
+        target=mask_email(email),
         target_type=TargetType.email,
         status=TaskStatus.running,
     )
@@ -30,7 +30,66 @@ async def run(email: str) -> OsintResult:
             source="dig", confidence=Confidence.high,
         ))
 
-    # ── holehe ────────────────────────────────────────────────────────────────
+    # ── IPQualityScore ────────────────────────────────────────────────────────
+    iqs = await ipqualityscore.check_email(email)
+    if iqs.get("available"):
+        result.sources.append(Source(name="IPQualityScore", url="https://www.ipqualityscore.com"))
+
+        fraud_score = iqs.get("fraud_score", 0)
+        result.findings.append(Finding(
+            type="fraud_score", value=fraud_score, source="IPQualityScore",
+            confidence=Confidence.high,
+            notes="Score 0-100. >75 = suspicious, >90 = high risk",
+        ))
+
+        for field in ("valid", "deliverability", "dns_valid", "smtp_score",
+                      "overall_score", "common", "generic"):
+            if iqs.get(field) is not None:
+                result.findings.append(Finding(
+                    type=field, value=iqs[field], source="IPQualityScore",
+                    confidence=Confidence.high,
+                ))
+
+        if iqs.get("disposable") or iqs.get("temporary"):
+            result.risk = Risk.high
+            result.warnings.append("Disposable/temporary email address detected")
+            result.findings.append(Finding(
+                type="disposable", value=True, source="IPQualityScore",
+                confidence=Confidence.high,
+            ))
+
+        if iqs.get("spam_trap") and iqs["spam_trap"] != "none":
+            result.risk = Risk.high
+            result.warnings.append(f"Spam trap detected: {iqs['spam_trap']}")
+            result.findings.append(Finding(
+                type="spam_trap", value=iqs["spam_trap"], source="IPQualityScore",
+                confidence=Confidence.high,
+            ))
+
+        if iqs.get("leaked"):
+            result.risk = Risk.high
+            result.warnings.append("Email found in known data breach databases (IPQualityScore)")
+            result.findings.append(Finding(
+                type="leaked", value=True, source="IPQualityScore",
+                confidence=Confidence.high,
+            ))
+
+        if fraud_score > 90:
+            result.risk = Risk.high
+            result.warnings.append(f"Very high fraud score: {fraud_score}/100")
+        elif fraud_score > 75:
+            if result.risk == Risk.unknown:
+                result.risk = Risk.medium
+            result.warnings.append(f"Elevated fraud score: {fraud_score}/100")
+
+        if iqs.get("suggested_domain"):
+            result.findings.append(Finding(
+                type="suggested_domain", value=iqs["suggested_domain"],
+                source="IPQualityScore", confidence=Confidence.medium,
+                notes="Possible typo in email domain",
+            ))
+
+    # ── holehe (service registrations) ───────────────────────────────────────
     holehe_run = await run_cli_tool("holehe", ["--no-color", "--only-used", email])
     if holehe_run.stdout:
         parsed = holehe_parser.parse(holehe_run.stdout)
@@ -51,7 +110,8 @@ async def run(email: str) -> OsintResult:
             source="EmailRep", confidence=Confidence.high,
         ))
         if erep.get("suspicious"):
-            result.risk = Risk.high
+            if result.risk == Risk.unknown:
+                result.risk = Risk.medium
             result.warnings.append("EmailRep flags this address as suspicious")
         if erep.get("profiles"):
             result.findings.append(Finding(
@@ -59,7 +119,7 @@ async def run(email: str) -> OsintResult:
                 source="EmailRep", confidence=Confidence.medium,
             ))
 
-    # ── HIBP ──────────────────────────────────────────────────────────────────
+    # ── HIBP (breach exposure) ────────────────────────────────────────────────
     hibp_data = await hibp.check_email(email)
     if hibp_data.get("available"):
         result.sources.append(Source(name="HaveIBeenPwned", url="https://haveibeenpwned.com"))
