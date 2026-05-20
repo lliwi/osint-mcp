@@ -140,8 +140,12 @@ async def get_task(task_id: str):
 
 # ─── Reports ──────────────────────────────────────────────────────────────────
 
+class ReportFormatRequest(BaseModel):
+    format: str = "markdown"
+
+
 @app.post("/reports/{task_id}", dependencies=[Depends(require_api_key)])
-async def generate_report(task_id: str, req: ReportRequest):
+async def generate_report(task_id: str, req: ReportFormatRequest):
     record = await task_store.get(task_id)
     if record is None:
         raise HTTPException(status_code=404, detail=f"Task '{task_id}' not found")
