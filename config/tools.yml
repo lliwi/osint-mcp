@@ -207,6 +207,23 @@ tools:
     timeout: 15
     allowed_args: []
 
+  - name: peopledatalabs
+    category: username
+    type: api
+    enabled: true
+    requires_api_key: true
+    risk_level: low
+    description: >
+      People Data Labs person enrichment — name, location, employment history,
+      education, social profiles, skills and email domains from email, phone or username.
+      Confidence scored 1-10. Only returns results with likelihood >= 6.
+    inputs: [email, phone, username, linkedin_url, github_url, twitter_url]
+    outputs: [full_name, location, current_job, work_history, education,
+              social_profiles, skills, languages, known_email_domains, likelihood]
+    parser: peopledatalabs_parser
+    timeout: 20
+    allowed_args: []
+
   - name: intelligencex
     category: username
     type: api

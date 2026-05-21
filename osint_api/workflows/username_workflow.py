@@ -3,7 +3,7 @@ from __future__ import annotations
 from mcp_server.schemas.common import (
     Confidence, Entity, Finding, OsintResult, Risk, Source, TargetType, TaskStatus,
 )
-from osint_api.connectors import fullcontact, intelligencex
+from osint_api.connectors import fullcontact, intelligencex, peopledatalabs
 from osint_api.parsers import sherlock_parser
 from osint_api.runners.cli_runner import run_cli_tool
 from osint_api.security.validator import validate_username
@@ -89,6 +89,62 @@ async def run(username: str, platform_scope: str = "all") -> OsintResult:
                 source="FullContact", confidence=Confidence.medium,
                 notes="Partial emails from FullContact enrichment",
             ))
+
+    # ── People Data Labs ──────────────────────────────────────────────────────
+    pdl = await peopledatalabs.enrich_by_username(username)
+    if pdl.get("available") and pdl.get("found"):
+        result.sources.append(Source(name="PeopleDataLabs", url="https://www.peopledatalabs.com"))
+        likelihood = pdl.get("likelihood", 0)
+        conf = Confidence.high if likelihood >= 8 else Confidence.medium
+
+        for field in ("full_name", "location", "country", "gender", "birth_year",
+                      "industry", "languages"):
+            if pdl.get(field) is not None:
+                result.findings.append(Finding(
+                    type=field, value=pdl[field], source="PeopleDataLabs",
+                    confidence=conf,
+                ))
+        if pdl.get("current_job"):
+            result.findings.append(Finding(
+                type="current_job", value=pdl["current_job"],
+                source="PeopleDataLabs", confidence=conf,
+            ))
+        if pdl.get("experience"):
+            result.findings.append(Finding(
+                type="work_history", value=pdl["experience"],
+                source="PeopleDataLabs", confidence=conf,
+            ))
+        if pdl.get("education"):
+            result.findings.append(Finding(
+                type="education", value=pdl["education"],
+                source="PeopleDataLabs", confidence=conf,
+            ))
+        if pdl.get("social_profiles"):
+            result.findings.append(Finding(
+                type="pdl_social_profiles", value=pdl["social_profiles"],
+                source="PeopleDataLabs", confidence=conf,
+            ))
+        if pdl.get("skills"):
+            result.findings.append(Finding(
+                type="skills", value=pdl["skills"],
+                source="PeopleDataLabs", confidence=Confidence.medium,
+            ))
+        if pdl.get("work_email_hint"):
+            result.findings.append(Finding(
+                type="work_email_hint", value=pdl["work_email_hint"],
+                source="PeopleDataLabs", confidence=Confidence.medium,
+                notes="Partial work email — full address not shown for privacy",
+            ))
+        if pdl.get("known_email_domains"):
+            result.findings.append(Finding(
+                type="known_email_domains", value=pdl["known_email_domains"],
+                source="PeopleDataLabs", confidence=Confidence.medium,
+            ))
+        result.findings.append(Finding(
+            type="pdl_likelihood", value=likelihood,
+            source="PeopleDataLabs", confidence=Confidence.high,
+            notes="PDL confidence score 1-10. >=6 returned, >=8 = high confidence",
+        ))
 
     # ── Intelligence X ────────────────────────────────────────────────────────
     intelx = await intelligencex.search(username, max_results=10)

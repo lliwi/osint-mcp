@@ -3,7 +3,7 @@ from __future__ import annotations
 from mcp_server.schemas.common import (
     Confidence, Finding, OsintResult, Risk, Source, TargetType, TaskStatus,
 )
-from osint_api.connectors import emailrep, fullcontact, hibp, intelligencex, ipqualityscore
+from osint_api.connectors import emailrep, fullcontact, hibp, intelligencex, ipqualityscore, peopledatalabs
 from osint_api.parsers import holehe_parser
 from osint_api.runners.cli_runner import run_cli_tool
 from osint_api.security.sanitizer import mask_email
@@ -157,6 +157,42 @@ async def run(email: str) -> OsintResult:
                 type="social_profiles", value=fc["social_profiles"],
                 source="FullContact", confidence=Confidence.high,
             ))
+
+    # ── People Data Labs (person enrichment) ─────────────────────────────────
+    pdl = await peopledatalabs.enrich_by_email(email)
+    if pdl.get("available") and pdl.get("found"):
+        result.sources.append(Source(name="PeopleDataLabs", url="https://www.peopledatalabs.com"))
+        likelihood = pdl.get("likelihood", 0)
+        conf = Confidence.high if likelihood >= 8 else Confidence.medium
+
+        for field in ("full_name", "location", "country", "gender",
+                      "birth_year", "industry"):
+            if pdl.get(field) is not None:
+                result.findings.append(Finding(
+                    type=field, value=pdl[field], source="PeopleDataLabs",
+                    confidence=conf,
+                ))
+        if pdl.get("current_job"):
+            result.findings.append(Finding(
+                type="current_job", value=pdl["current_job"],
+                source="PeopleDataLabs", confidence=conf,
+            ))
+        if pdl.get("social_profiles"):
+            result.findings.append(Finding(
+                type="pdl_social_profiles", value=pdl["social_profiles"],
+                source="PeopleDataLabs", confidence=conf,
+            ))
+        if pdl.get("known_email_domains"):
+            result.findings.append(Finding(
+                type="known_email_domains", value=pdl["known_email_domains"],
+                source="PeopleDataLabs", confidence=Confidence.medium,
+                notes="Other email domains associated with this person",
+            ))
+        result.findings.append(Finding(
+            type="pdl_likelihood", value=likelihood,
+            source="PeopleDataLabs", confidence=Confidence.high,
+            notes="PDL confidence score 1-10",
+        ))
 
     # ── Intelligence X (leaks, pastes, darkweb) ───────────────────────────────
     intelx = await intelligencex.search_leaks_only(email, max_results=10)

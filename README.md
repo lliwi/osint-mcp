@@ -163,6 +163,7 @@ Todas son opcionales. El sistema funciona con las que estén configuradas y degr
 | `IPQUALITYSCORE_API_KEY` | IPQualityScore — fraud scoring para email, teléfono e IP | Sí (5000 req/mes) | [ipqualityscore.com/user/settings](https://www.ipqualityscore.com/user/settings) |
 | `FULLCONTACT_API_KEY` | FullContact — enriquecimiento de persona (nombre, empleo, perfiles sociales) | Sí (500 req/mes) | [dashboard.fullcontact.com](https://dashboard.fullcontact.com/) |
 | `INTELX_API_KEY` | Intelligence X — búsqueda en leaks, pastes, darkweb, Telegram | Sí (limitado) | [intelx.io](https://intelx.io/) → Account → API |
+| `PEOPLEDATALABS_API_KEY` | People Data Labs — enriquecimiento de persona: historial laboral, educación, skills, perfiles sociales, dominios email | Sí (100 req/mes free) | [peopledatalabs.com](https://www.peopledatalabs.com/) → API Keys |
 | `SECURITYTRAILS_API_KEY` | SecurityTrails — DNS histórico, subdominios | Sí (50 req/mes) | [securitytrails.com/app/account/credentials](https://securitytrails.com/app/account/credentials) |
 | `TINEYE_API_KEY` | TinEye — búsqueda inversa de imágenes | No (desde $200/mes) | [api.tineye.com](https://api.tineye.com/) |
 | `NUMVERIFY_API_KEY` | Numverify — validación de teléfonos | Sí (100 req/mes) | [numverify.com/dashboard](https://numverify.com/dashboard) |
