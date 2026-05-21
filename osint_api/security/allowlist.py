@@ -77,8 +77,9 @@ TOOL_ALLOWLIST: dict[str, dict] = {
     },
     "exiftool": {
         "binary": "exiftool",
-        "allowed_flags": ["-json", "-csv", "-n", "-q", "-s", "-GPS*", "-Author",
-                          "-CreateDate", "-ModifyDate", "-Software", "-FileType"],
+        "allowed_flags": ["-json", "-csv", "-n", "-q", "-s", "-a",
+                          "-GPS*", "-Author", "-CreateDate", "-ModifyDate",
+                          "-Software", "-FileType", "-all", "-ee"],
         "positional_validators": ["filepath"],
         "timeout": 30,
     },

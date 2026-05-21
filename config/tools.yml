@@ -250,18 +250,25 @@ tools:
 
   # ── Image ──────────────────────────────────────────────────────────────────
   - name: exiftool
-    category: image
+    category: metadata
     type: cli
     binary: exiftool
     enabled: true
     requires_api_key: false
     risk_level: low
-    description: Extract metadata from images and documents
+    description: >
+      Extract and analyse metadata from images (JPEG, PNG, TIFF, RAW, HEIC),
+      PDF documents, and office files (DOCX, XLSX, PPTX, ODT, ODS, ODP,
+      DOC, XLS, PPT). Detects GPS coordinates, author trail, company info,
+      internal paths, revision history and editing software.
     inputs: [filepath]
-    outputs: [gps, author, software, dates, camera, file_type]
+    outputs: [gps, author, last_modified_by, company, template, revision,
+              create_date, modify_date, camera, software, page_count, encryption,
+              file_type, mime_type, privacy_risks]
     parser: exiftool_parser
     timeout: 30
-    allowed_args: ["-json", "-csv", "-n", "-q", "-s", "-GPS*", "-Author", "-CreateDate", "-ModifyDate", "-Software", "-FileType"]
+    allowed_args: ["-json", "-csv", "-n", "-q", "-s", "-a", "-all", "-ee",
+                   "-GPS*", "-Author", "-CreateDate", "-ModifyDate", "-Software", "-FileType"]
 
   # ── Metadata ───────────────────────────────────────────────────────────────
   - name: mat2
@@ -271,9 +278,9 @@ tools:
     enabled: true
     requires_api_key: false
     risk_level: low
-    description: Metadata analysis and removal
+    description: Show and remove metadata from images, PDFs and office documents
     inputs: [filepath]
-    outputs: [metadata_fields, sanitized_path]
+    outputs: [metadata_fields, sanitizable_fields]
     parser: mat2_parser
     timeout: 30
     allowed_args: ["--show", "--inplace", "--no-sandbox"]
@@ -285,9 +292,9 @@ tools:
     enabled: true
     requires_api_key: false
     risk_level: low
-    description: PDF metadata extraction
+    description: PDF-specific metadata — author, creator, producer, page count, encryption status
     inputs: [filepath]
-    outputs: [author, creator, dates, encrypted, pages]
+    outputs: [author, creator, producer, dates, encrypted, pages, pdf_version]
     parser: pdfinfo_parser
     timeout: 15
     allowed_args: ["-meta", "-enc", "-l"]
@@ -299,12 +306,26 @@ tools:
     enabled: true
     requires_api_key: false
     risk_level: low
-    description: File type detection
+    description: Detect file type and MIME type from magic bytes (not extension)
     inputs: [filepath]
     outputs: [file_type, mime_type]
     parser: file_parser
     timeout: 10
     allowed_args: ["-b", "-i", "--mime-type"]
+
+  - name: strings
+    category: metadata
+    type: cli
+    binary: strings
+    enabled: true
+    requires_api_key: false
+    risk_level: low
+    description: Extract printable strings from binary files — useful for legacy Office formats
+    inputs: [filepath]
+    outputs: [suspicious_strings, paths, emails, keywords]
+    parser: strings_parser
+    timeout: 15
+    allowed_args: ["-n", "-a"]
 
   # ── Breach / Leaks ─────────────────────────────────────────────────────────
   - name: gitleaks
