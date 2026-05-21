@@ -151,6 +151,27 @@ _TOOLS = [
         },
     ),
     Tool(
+        name="vehicle_recon",
+        description="Look up a Spanish license plate via RapidAPI. Returns brand, model, year, "
+                    "color, fuel type, ITV status, insurance and environmental badge. "
+                    "Owner data suppressed by default (requires RGPD legal basis).",
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "plate": {
+                    "type": "string",
+                    "description": "Spanish license plate, e.g. 1234BCD or M1234AB",
+                },
+                "country": {
+                    "type": "string",
+                    "default": "ES",
+                    "description": "Country code (currently only ES supported)",
+                },
+            },
+            "required": ["plate"],
+        },
+    ),
+    Tool(
         name="list_osint_tools",
         description="List available OSINT tools in the catalog, optionally filtered by category.",
         inputSchema={
@@ -292,6 +313,7 @@ async def _dispatch(name: str, args: dict) -> str:
             "reverse_image_search": "reverse_image_search",
             "metadata_analysis": "metadata_analysis",
             "breach_exposure_check": "breach_exposure_check",
+            "vehicle_recon": "vehicle_recon",
             "run_osint_workflow": args.get("workflow", ""),
         }
 
@@ -305,6 +327,7 @@ async def _dispatch(name: str, args: dict) -> str:
             "reverse_image_search": "image_path",
             "metadata_analysis": "file_path",
             "breach_exposure_check": "indicator",
+            "vehicle_recon": "plate",
         }
         target_key = target_key_map.get(name, "target")
         target = args.get(target_key) or args.get("target", "")

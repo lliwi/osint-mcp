@@ -344,6 +344,24 @@ tools:
     timeout: 15
     allowed_args: ["-n", "-a"]
 
+  # ── Vehicle ───────────────────────────────────────────────────────────────
+  - name: rapidapi_license_plate_spain
+    category: vehicle
+    type: api
+    enabled: true
+    requires_api_key: true
+    risk_level: medium
+    description: >
+      Spanish license plate lookup via RapidAPI. Returns brand, model, year, colour,
+      fuel type, engine data, ITV status, insurance and DGT environmental badge.
+      Owner data (titular) suppressed by default — requires RGPD legal basis.
+    inputs: [plate]
+    outputs: [brand, model, year, color, fuel_type, engine, itv_status,
+              insurance, environmental_badge, stolen_flag]
+    parser: vehicle_parser
+    timeout: 20
+    allowed_args: []
+
   # ── Breach / Leaks ─────────────────────────────────────────────────────────
   - name: gitleaks
     category: breach

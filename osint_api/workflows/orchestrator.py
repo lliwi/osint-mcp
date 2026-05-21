@@ -14,6 +14,7 @@ from osint_api.workflows import (
     metadata_workflow,
     phone_workflow,
     username_workflow,
+    vehicle_workflow,
 )
 
 # Auto-detect types for recommend_osint_workflow
@@ -26,6 +27,7 @@ _TYPE_WORKFLOW_MAP: dict[str, list[str]] = {
     "image": ["reverse_image_search", "metadata_analysis"],
     "file": ["metadata_analysis"],
     "url": ["breach_exposure_check"],
+    "plate": ["vehicle_recon"],
 }
 
 
@@ -49,6 +51,7 @@ _WORKFLOWS: dict[str, callable] = {
     "reverse_image_search": _wrap(image_workflow.run, "image_path", "search_scope"),
     "metadata_analysis": _wrap(metadata_workflow.run, "file_path"),
     "breach_exposure_check": _wrap(breach_workflow.run, "indicator", "indicator_type"),
+    "vehicle_recon": _wrap(vehicle_workflow.run, "plate", "country"),
 }
 
 
@@ -76,6 +79,12 @@ def recommend(indicator: str) -> dict:
         detected = "ip"
     elif re.match(r"^\+?[0-9\s\-().]{7,15}$", indicator):
         detected = "phone"
+    # Spanish modern plate: 4 digits + 3 consonants
+    elif re.match(r"^\d{4}[B-DF-HJ-NP-TV-Zb-df-hj-np-tv-z]{3}$", indicator):
+        detected = "plate"
+    # Old Spanish plate: letters + digits + letters
+    elif re.match(r"^[A-Za-z]{1,2}\d{4}[A-Za-z]{1,2}$", indicator):
+        detected = "plate"
     elif re.match(r"^[a-zA-Z0-9._\-]{1,64}$", indicator) and "." not in indicator:
         detected = "username"
     elif "." in indicator:
@@ -89,6 +98,8 @@ def recommend(indicator: str) -> dict:
         notes.append("Email analysis does not attempt login, send emails, or show passwords")
     if detected == "phone":
         notes.append("Phone lookup for public OSINT only — respect jurisdiction privacy laws")
+    if detected == "plate":
+        notes.append("Vehicle lookup uses public DGT records. Owner data requires legal basis under RGPD.")
 
     return {
         "detected_type": detected,
