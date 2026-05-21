@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "OSINT MCP Server",
-    "description": "API for passive OSINT intelligence gathering on domains, IPs, emails, phones, usernames and files. Public sources only. No active exploitation or privacy violations.",
+    "description": "API for passive OSINT intelligence gathering on domains, IPs, emails, phones, usernames, files and vehicles. Public sources only. No active exploitation or privacy violations.",
     "version": "0.1.0"
   },
   "servers": [
@@ -47,7 +47,7 @@
             "name": "category",
             "in": "query",
             "required": false,
-            "description": "Filter by category: all, domain, ip, email, phone, username, image, metadata, breach",
+            "description": "Filter by category: all, domain, ip, email, phone, username, image, metadata, breach, vehicle",
             "schema": {
               "type": "string",
               "default": "all"
@@ -84,7 +84,7 @@
       "post": {
         "operationId": "runOsintWorkflow",
         "summary": "Launch an OSINT workflow",
-        "description": "Starts an OSINT workflow. Returns task_id; poll GET /tasks/{task_id}. Pick by type: email=email_reputation, domain=domain_recon, ip=ip_reputation, phone=phone_reputation, username=username_recon, breach=breach_exposure_check, license_plate=vehicle_recon.",
+        "description": "Starts an OSINT workflow. Returns task_id; poll GET /tasks/{task_id}. Pick by type: email=email_reputation, domain=domain_recon, ip=ip_reputation, phone=phone_reputation, username=username_recon, breach=breach_exposure_check, plate/VIN=vehicle_recon.",
         "requestBody": {
           "required": true,
           "content": {
@@ -252,7 +252,7 @@
           },
           "target": {
             "type": "string",
-            "description": "The indicator to analyze: domain, IP, email, phone, username, URL, or license plate (e.g. 1234BCD)"
+            "description": "The indicator to analyze: domain, IP, email, phone, username, URL, Spanish license plate (e.g. 1234BCD) or VIN (17 chars)"
           },
           "mode": {
             "type": "string",
@@ -266,7 +266,7 @@
           },
           "options": {
             "type": "object",
-            "description": "Extra params: depth (quick/standard/deep), country_hint (ISO code), indicator_type (auto/email/domain/url), platform_scope (all or platform name)",
+            "description": "Extra params: depth (quick/standard/deep for domain_recon), country_hint (ISO code for phone), indicator_type (auto/email/domain/url for breach), platform_scope (for username_recon), country (ES for vehicle_recon)",
             "additionalProperties": true
           }
         }
@@ -341,7 +341,7 @@
       "Finding": {
         "type": "object",
         "properties": {
-          "type": {"type": "string", "description": "e.g. dns_a, whois_registrar, breach_count"},
+          "type": {"type": "string", "description": "e.g. dns_a, whois_registrar, vehicle_identity, pdl_social_profiles"},
           "value": {"type": "string", "description": "Finding value as string or JSON"},
           "source": {"type": "string"},
           "confidence": {
