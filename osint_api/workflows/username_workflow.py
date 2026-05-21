@@ -95,40 +95,84 @@ async def run(username: str, platform_scope: str = "all") -> OsintResult:
     if pdl.get("available") and pdl.get("found"):
         result.sources.append(Source(name="PeopleDataLabs", url="https://www.peopledatalabs.com"))
         likelihood = pdl.get("likelihood", 0)
-        conf = Confidence.high if likelihood >= 8 else Confidence.medium
+        likelihood_pct = pdl.get("likelihood_pct", 0)
+        conf = Confidence.high if likelihood >= 7 else Confidence.medium
 
-        for field in ("full_name", "location", "country", "gender", "birth_year",
-                      "industry", "languages"):
-            if pdl.get(field) is not None:
+        # Identity
+        for field in ("full_name", "gender", "birth_year", "industry", "summary"):
+            if pdl.get(field):
                 result.findings.append(Finding(
-                    type=field, value=pdl[field], source="PeopleDataLabs",
-                    confidence=conf,
+                    type=field, value=pdl[field], source="PeopleDataLabs", confidence=conf,
                 ))
-        if pdl.get("current_job"):
+
+        # Current job
+        if pdl.get("job_title") or pdl.get("job_company_name"):
             result.findings.append(Finding(
-                type="current_job", value=pdl["current_job"],
+                type="current_job",
+                value={
+                    "title":   pdl.get("job_title", ""),
+                    "company": pdl.get("job_company_name", ""),
+                    "website": pdl.get("job_company_website", ""),
+                },
                 source="PeopleDataLabs", confidence=conf,
             ))
+
+        # Work history
         if pdl.get("experience"):
             result.findings.append(Finding(
                 type="work_history", value=pdl["experience"],
                 source="PeopleDataLabs", confidence=conf,
             ))
+
+        # Education
         if pdl.get("education"):
             result.findings.append(Finding(
                 type="education", value=pdl["education"],
                 source="PeopleDataLabs", confidence=conf,
             ))
-        if pdl.get("social_profiles"):
+
+        # Locations
+        if pdl.get("locations"):
             result.findings.append(Finding(
-                type="pdl_social_profiles", value=pdl["social_profiles"],
+                type="locations", value=pdl["locations"],
                 source="PeopleDataLabs", confidence=conf,
             ))
+
+        # Social profiles (richer than FullContact)
+        if pdl.get("profiles"):
+            result.findings.append(Finding(
+                type="pdl_social_profiles", value=pdl["profiles"],
+                source="PeopleDataLabs", confidence=conf,
+                notes=f"{len(pdl['profiles'])} perfiles encontrados",
+            ))
+            for p in pdl["profiles"]:
+                if p.get("url"):
+                    result.entities.append(Entity(
+                        type="social_profile",
+                        value=p["url"],
+                        attributes={"platform": p["network"], "username": p.get("username", "")},
+                    ))
+
+        # Social links (dedicated URL fields)
+        if pdl.get("social_links"):
+            result.findings.append(Finding(
+                type="pdl_social_links", value=pdl["social_links"],
+                source="PeopleDataLabs", confidence=Confidence.high,
+            ))
+
+        # Skills & languages
         if pdl.get("skills"):
             result.findings.append(Finding(
                 type="skills", value=pdl["skills"],
                 source="PeopleDataLabs", confidence=Confidence.medium,
             ))
+        if pdl.get("languages"):
+            result.findings.append(Finding(
+                type="languages", value=pdl["languages"],
+                source="PeopleDataLabs", confidence=Confidence.medium,
+            ))
+
+        # Contact hints (privacy-safe)
         if pdl.get("work_email_hint"):
             result.findings.append(Finding(
                 type="work_email_hint", value=pdl["work_email_hint"],
@@ -140,10 +184,14 @@ async def run(username: str, platform_scope: str = "all") -> OsintResult:
                 type="known_email_domains", value=pdl["known_email_domains"],
                 source="PeopleDataLabs", confidence=Confidence.medium,
             ))
+
+        # Confidence score
         result.findings.append(Finding(
-            type="pdl_likelihood", value=likelihood,
+            type="pdl_likelihood",
+            value={"score": likelihood, "percent": likelihood_pct,
+                   "matched_fields": pdl.get("matched_fields", [])},
             source="PeopleDataLabs", confidence=Confidence.high,
-            notes="PDL confidence score 1-10. >=6 returned, >=8 = high confidence",
+            notes="PDL match confidence. Score 1-10, higher = more reliable.",
         ))
 
     # ── Intelligence X ────────────────────────────────────────────────────────
