@@ -134,33 +134,29 @@ def validate_wallet(value: str) -> str:
 
 def validate_license_plate(value: str, country: str = "ES") -> str:
     """
-    Validates and normalises a vehicle license plate.
-    Supported countries: ES (Spain), EU (generic European).
-    Returns uppercase normalised plate without separators.
+    Validates and normalises a Spanish license plate or VIN.
+    Returns uppercase normalised value without separators.
     """
     value = value.strip().upper().replace("-", "").replace(" ", "").replace(".", "")
 
-    if country == "ES":
-        # Modern Spain (since 2000): 4 digits + 3 letters (no vowels AEIOUÑ, no Q)
-        # e.g. 1234BCD → valid
-        _ES_MODERN = re.compile(r"^\d{4}[B-DF-HJ-NP-TV-Z]{3}$")
-        # Old provincial: 1-2 letters + 4 digits + 1-2 letters (e.g. M1234AB, MA1234AB)
-        _ES_OLD = re.compile(r"^[A-Z]{1,2}\d{4}[A-Z]{1,2}$")
-        # Diplomatic / special: CD-12-34, etc.
-        _ES_SPECIAL = re.compile(r"^(CD|CC|OC|ET|EMT|PMM|TV|V|BU|GC|MU|AV|BI|CS|J|T|S|TF|Z)\d{2,5}$")
-
-        if not (_ES_MODERN.match(value) or _ES_OLD.match(value) or _ES_SPECIAL.match(value)):
-            raise ValidationError(
-                f"Invalid Spanish license plate: '{value}'. "
-                "Expected format: 4 digits + 3 consonants (e.g. 1234BCD) or old provincial format."
-            )
+    # VIN (17 chars, used internationally)
+    _VIN = re.compile(r"^[A-HJ-NPR-Z0-9]{17}$")
+    if _VIN.match(value):
         return value
 
-    # Generic EU: 1-3 letters + 1-4 digits + 0-3 letters
-    _EU_GENERIC = re.compile(r"^[A-Z0-9]{2,10}$")
-    if not _EU_GENERIC.match(value):
-        raise ValidationError(f"Invalid license plate format: '{value}'")
-    return value
+    # Modern Spain (since 2000): 4 digits + 3 letters (all consonants accepted here;
+    # the API validates the actual format)
+    _ES_MODERN = re.compile(r"^\d{4}[A-Z]{3}$")
+    # Old provincial: 1-2 letters + 4 digits + 2 letters
+    _ES_OLD = re.compile(r"^[A-Z]{1,2}\d{4}[A-Z]{2}$")
+
+    if _ES_MODERN.match(value) or _ES_OLD.match(value):
+        return value
+
+    raise ValidationError(
+        f"Formato no reconocido: '{value}'. "
+        "Usa una matrícula española (ej. 1234ABC, M1234AB) o un VIN de 17 caracteres."
+    )
 
 
 def validate_hash(value: str) -> str:

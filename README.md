@@ -168,7 +168,7 @@ Todas son opcionales. El sistema funciona con las que estén configuradas y degr
 | `TINEYE_API_KEY` | TinEye — búsqueda inversa de imágenes | No (desde $200/mes) | [api.tineye.com](https://api.tineye.com/) |
 | `NUMVERIFY_API_KEY` | Numverify — validación de teléfonos | Sí (100 req/mes) | [numverify.com/dashboard](https://numverify.com/dashboard) |
 | `TWILIO_ACCOUNT_SID` + `TWILIO_AUTH_TOKEN` | Twilio Lookup — carrier, tipo de línea | Pago por uso ($0.005/req) | [console.twilio.com](https://console.twilio.com/) |
-| `RAPIDAPI_KEY` + `RAPIDAPI_VEHICLE_HOST` | RapidAPI License Plate Spain — matrícula → marca, modelo, año, ITV, seguro | Según plan | [rapidapi.com](https://rapidapi.com/) → buscar "License Plate Spain" |
+| `RAPIDAPI_KEY` | RapidAPI (Autoways/DGT) — matrícula o VIN → marca, modelo, motor, emisiones, fechas | Según plan | [rapidapi.com — Autoways](https://rapidapi.com/autoways/api/api-license-plate-spain-matricula-api-espana) |
 
 ---
 

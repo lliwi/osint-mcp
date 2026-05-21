@@ -1,216 +1,169 @@
 """
-Spanish vehicle lookup via RapidAPI — License Plate Spain API.
-Returns technical vehicle data from DGT records.
+Spanish vehicle lookup via RapidAPI — Autoways / DGT API.
+Supports Spanish license plate (matrícula) and VIN (bastidor).
 
-RapidAPI subscription required: search "License plate Spain" on rapidapi.com
-The host varies by provider — configure via RAPIDAPI_VEHICLE_HOST.
-
-Privacy note: owner name and address data requires legal basis under RGPD.
-This connector surfaces only technical/public vehicle data by default.
+API: api-license-plate-spain-matricula-api-espana (RapidAPI / Autoways)
+Host: api-license-plate-spain-matricula-api-espana.p.rapidapi.com
+Docs: https://rapidapi.com/autoways/api/api-license-plate-spain-matricula-api-espana
 """
 from __future__ import annotations
 
+import re
 import os
 import httpx
 
-# RapidAPI credentials
-_RAPIDAPI_KEY  = lambda: os.getenv("RAPIDAPI_KEY", "")
-_VEHICLE_HOST  = lambda: os.getenv("RAPIDAPI_VEHICLE_HOST",
-                                   "license-plate-spain2.p.rapidapi.com")
+_HOST = "api-license-plate-spain-matricula-api-espana.p.rapidapi.com"
+_URL  = f"https://{_HOST}/"
 
-# Whether to include owner data if returned (requires legal basis)
-_INCLUDE_OWNER = os.getenv("VEHICLE_INCLUDE_OWNER_DATA", "false").lower() == "true"
+_PLATE_MODERN = re.compile(r"^[0-9]{4}[A-Z]{3}$")
+_PLATE_OLD    = re.compile(r"^[A-Z]{1,2}[0-9]{4}[A-Z]{2}$")
+_VIN_PATTERN  = re.compile(r"^[A-HJ-NPR-Z0-9]{17}$", re.IGNORECASE)
+
+
+def _key() -> str:
+    return os.getenv("RAPIDAPI_KEY", "")
 
 
 def _available() -> bool:
-    return bool(_RAPIDAPI_KEY()) and bool(_VEHICLE_HOST())
+    return bool(_key())
 
 
 def _headers() -> dict:
     return {
-        "x-rapidapi-key":  _RAPIDAPI_KEY(),
-        "x-rapidapi-host": _VEHICLE_HOST(),
+        "X-RapidAPI-Key":  _key(),
+        "X-RapidAPI-Host": _HOST,
     }
 
 
-async def lookup_plate(plate: str) -> dict:
+def detect_query_type(query: str) -> str:
+    """Return 'plate', 'vin', or 'unknown'."""
+    q = query.strip().upper().replace("-", "").replace(" ", "")
+    if _VIN_PATTERN.match(q):
+        return "vin"
+    if _PLATE_MODERN.match(q) or _PLATE_OLD.match(q):
+        return "plate"
+    return "unknown"
+
+
+async def lookup(query: str, query_type: str = "auto") -> dict:
     """
-    Look up a Spanish license plate.
-    Returns technical vehicle data: brand, model, year, fuel, colour, ITV status.
-    Owner data omitted unless VEHICLE_INCLUDE_OWNER_DATA=true and legally authorised.
+    Look up a vehicle by Spanish plate or VIN.
+
+    Args:
+        query:      Matrícula (e.g. '1234ABC') or VIN (17 chars).
+        query_type: 'plate', 'vin', or 'auto' (default).
     """
-    if not _available():
+    query = query.strip().upper().replace("-", "").replace(" ", "")
+
+    if query_type == "auto":
+        query_type = detect_query_type(query)
+
+    if query_type == "unknown":
         return {
-            "available": False,
-            "reason": "RAPIDAPI_KEY or RAPIDAPI_VEHICLE_HOST not configured",
+            "available": True,
+            "found": False,
+            "error": (
+                "Formato no reconocido. Usa una matrícula española (ej. 1234ABC) "
+                "o un VIN de 17 caracteres."
+            ),
         }
+
+    if not _available():
+        return {"available": False, "reason": "RAPIDAPI_KEY not configured"}
+
+    params = {"country": "es"}
+    if query_type == "plate":
+        params["plaque"] = query
+    else:
+        params["vin"] = query
 
     try:
         async with httpx.AsyncClient(timeout=20) as client:
-            resp = await client.get(
-                f"https://{_VEHICLE_HOST()}/",
-                params={"plate": plate},
-                headers=_headers(),
-            )
-            if resp.status_code == 404:
-                return {"available": True, "found": False, "plate": plate}
-            if resp.status_code == 401:
-                return {"available": False, "error": "Invalid RapidAPI key"}
+            resp = await client.get(_URL, params=params, headers=_headers())
+
+            if resp.status_code in (401, 403):
+                return {"available": False, "error": "Invalid RapidAPI key or no active subscription"}
             if resp.status_code == 429:
                 return {"available": False, "error": "RapidAPI rate limit exceeded"}
+            if resp.status_code == 404:
+                return {"available": True, "found": False, "query": query}
+
             resp.raise_for_status()
-            data = resp.json()
+            payload = resp.json()
+
+    except httpx.TimeoutException:
+        return {"available": False, "error": "Request timed out"}
     except Exception as exc:
         return {"available": False, "error": str(exc)}
 
+    # API-level errors
+    if payload.get("error"):
+        return {
+            "available": True,
+            "found": False,
+            "error": payload.get("message", "API error"),
+        }
+
+    data = payload.get("data", {})
     if not data:
-        return {"available": True, "found": False, "plate": plate}
+        return {"available": True, "found": False, "query": query}
 
-    return _parse(plate, data)
-
-
-def _parse(plate: str, data: dict) -> dict:
-    """
-    Normalise the API response. Field names vary by RapidAPI provider.
-    Handles both snake_case and camelCase responses.
-    """
-    def _get(*keys: str, default="") -> str:
-        for k in keys:
-            v = data.get(k) or data.get(k.lower()) or data.get(_camel(k))
-            if v:
-                return str(v).strip()
-        return default
-
-    result: dict = {
+    return {
         "available": True,
         "found": True,
-        "plate": plate,
+        "query": query,
+        "query_type": query_type,
+        "source": "RapidAPI / Autoways (DGT)",
+        "vehicle_data": _normalize(data),
+        "raw": data,
     }
 
-    # ── Technical data (public) ───────────────────────────────────────────────
-    vehicle: dict = {}
 
-    brand = _get("brand", "marca", "make", "fabricante")
-    model = _get("model", "modelo")
-    version = _get("version", "variante", "variant")
-    if brand:
-        vehicle["brand"] = brand
-    if model:
-        vehicle["model"] = model
-    if version:
-        vehicle["version"] = version
+def _normalize(data: dict) -> dict:
+    """Map Autoways AWN_ prefixed fields to a clean schema."""
+    return {
+        # ── Identification ────────────────────────────────────────────────
+        "plate":           data.get("AWN_immat", ""),
+        "vin":             data.get("AWN_VIN", ""),
+        "make":            data.get("AWN_marque", ""),
+        "model":           data.get("AWN_modele", ""),
+        "version":         data.get("AWN_version", ""),
+        "commercial_name": data.get("AWN_nom_commercial", ""),
+        "label":           data.get("AWN_label", ""),
+        "color":           data.get("AWN_couleur", ""),
+        "body_type":       data.get("AWN_style_carrosserie", ""),
+        "platform_code":   data.get("AWN_code_platform", ""),
 
-    year = _get("year", "año", "anio", "firstRegistrationYear",
-                "fechaMatriculacion", "matriculationYear")
-    if year:
-        vehicle["year"] = year
+        # ── Engine & Performance ──────────────────────────────────────────
+        "fuel_type":       data.get("AWN_energie", ""),
+        "engine_code":     data.get("AWN_code_moteur", ""),
+        "engine_cc":       data.get("AWN_cylindre_capacite", ""),
+        "engine_liters":   data.get("AWN_cylindree_liters", ""),
+        "power_kw":        data.get("AWN_puissance_KW", ""),
+        "power_hp":        data.get("AWN_puissance_chevaux", ""),
+        "fiscal_power":    data.get("AWN_puissance_fiscale", ""),
+        "gearbox":         data.get("AWN_type_boite_vites", ""),
+        "num_gears":       data.get("AWN_nbr_vitesses", ""),
+        "max_speed_kmh":   data.get("AWN_max_speed", ""),
 
-    color = _get("color", "colour", "colorVehiculo")
-    if color:
-        vehicle["color"] = color
+        # ── Dimensions & Capacity ─────────────────────────────────────────
+        "num_doors":       data.get("AWN_nbr_portes", ""),
+        "num_seats":       data.get("AWN_nbr_places", ""),
+        "length_mm":       data.get("AWN_longueur", ""),
+        "width_mm":        data.get("AWN_largeur", ""),
+        "height_mm":       data.get("AWN_hauteur", ""),
+        "max_weight_kg":   data.get("AWN_PTAC", ""),
 
-    fuel = _get("fuel", "combustible", "fuelType", "tipoCombustible")
-    if fuel:
-        vehicle["fuel_type"] = fuel
+        # ── Emissions ─────────────────────────────────────────────────────
+        "co2_g_km":        data.get("AWN_emission_co_2", ""),
+        "euro_standard":   data.get("AWN_norme_euro_standardise", ""),
+        "consumption_l100":data.get("AWN_consommation_mixte", ""),
 
-    body = _get("bodyType", "carroceria", "tipoVehiculo", "vehicleType")
-    if body:
-        vehicle["body_type"] = body
+        # ── Tyres ─────────────────────────────────────────────────────────
+        "tyres":           data.get("AWN_pneus", ""),
 
-    doors = _get("doors", "puertas", "numeroPuertas")
-    if doors:
-        vehicle["doors"] = doors
-
-    displacement = _get("displacement", "cilindrada", "engineDisplacement")
-    power_cv = _get("power", "potencia", "powerCV", "cv", "kw", "powerKW")
-    if displacement:
-        vehicle["engine_displacement_cc"] = displacement
-    if power_cv:
-        vehicle["engine_power"] = power_cv
-
-    seats = _get("seats", "plazas", "numeroplazas")
-    if seats:
-        vehicle["seats"] = seats
-
-    tara = _get("tara", "weight", "pesoKg")
-    if tara:
-        vehicle["weight_kg"] = tara
-
-    if vehicle:
-        result["vehicle"] = vehicle
-
-    # ── ITV / Technical inspection ────────────────────────────────────────────
-    itv: dict = {}
-    itv_date = _get("itvDate", "fechaItv", "itv", "nextITV", "proximaItv",
-                    "fechaCaducidadItv")
-    itv_result = _get("itvResult", "resultadoItv", "itvStatus")
-    if itv_date:
-        itv["next_itv_date"] = itv_date
-    if itv_result:
-        itv["last_result"] = itv_result
-    if itv:
-        result["itv"] = itv
-
-    # ── Insurance ─────────────────────────────────────────────────────────────
-    insurance: dict = {}
-    insured = _get("insured", "asegurado", "tieneSeguro", "hasInsurance")
-    ins_company = _get("insuranceCompany", "aseguradora", "compania")
-    ins_expiry = _get("insuranceExpiry", "fechaVencimientoSeguro", "polizaVigencia")
-    if insured:
-        insurance["insured"] = insured
-    if ins_company:
-        insurance["company"] = ins_company
-    if ins_expiry:
-        insurance["expiry_date"] = ins_expiry
-    if insurance:
-        result["insurance"] = insurance
-
-    # ── Environmental badge (etiqueta DGT) ───────────────────────────────────
-    badge = _get("environmentalBadge", "etiquetaDgt", "etiqueta", "label")
-    if badge:
-        result["environmental_badge"] = badge
-
-    # ── Theft / reports ───────────────────────────────────────────────────────
-    stolen = _get("stolen", "robado", "reportedStolen")
-    if stolen:
-        result["stolen_flag"] = stolen
-
-    # ── Owner data (only if explicitly enabled + legal basis confirmed) ───────
-    if _INCLUDE_OWNER:
-        owner: dict = {}
-        owner_name = _get("ownerName", "titular", "nombre", "propietario")
-        owner_nif  = _get("ownerNif", "nif", "dni", "cif")
-        owner_addr = _get("ownerAddress", "domicilio", "direccion")
-        if owner_name:
-            owner["name"] = owner_name
-        if owner_nif:
-            owner["nif"] = owner_nif[:3] + "****" + owner_nif[-1] if len(owner_nif) > 4 else "***"
-        if owner_addr:
-            owner["address"] = owner_addr
-        if owner:
-            result["owner"] = owner
-            result["warnings"] = [
-                "Owner data shown — ensure legal basis under RGPD Art.6 before processing"
-            ]
-    else:
-        # Signal owner data was suppressed
-        has_owner = any(
-            k in data for k in ("ownerName", "titular", "nombre", "propietario")
-        )
-        if has_owner:
-            result["owner_data_suppressed"] = True
-            result.setdefault("warnings", [])
-            result["warnings"].append(
-                "Owner PII suppressed. Set VEHICLE_INCLUDE_OWNER_DATA=true only with legal basis."
-            )
-
-    # ── Raw data passthrough (for fields not mapped above) ────────────────────
-    result["raw"] = data
-
-    return result
-
-
-def _camel(snake: str) -> str:
-    """Convert snake_case to camelCase for field lookups."""
-    parts = snake.split("_")
-    return parts[0] + "".join(p.capitalize() for p in parts[1:])
+        # ── Dates ─────────────────────────────────────────────────────────
+        "first_registration": data.get("AWN_date_mise_en_circulation", ""),
+        "model_year_start":   data.get("AWN_annee_de_debut_modele", ""),
+        "model_year_end":     data.get("AWN_annee_de_fin_modele", ""),
+    }

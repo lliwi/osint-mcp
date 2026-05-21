@@ -84,7 +84,7 @@
       "post": {
         "operationId": "runOsintWorkflow",
         "summary": "Launch an OSINT workflow",
-        "description": "Starts an OSINT workflow. Returns task_id; poll GET /tasks/{task_id}. Pick by type: email=email_reputation, domain=domain_recon, ip=ip_reputation, phone=phone_reputation, username=username_recon, breach=breach_exposure_check.",
+        "description": "Starts an OSINT workflow. Returns task_id; poll GET /tasks/{task_id}. Pick by type: email=email_reputation, domain=domain_recon, ip=ip_reputation, phone=phone_reputation, username=username_recon, breach=breach_exposure_check, license_plate=vehicle_recon.",
         "requestBody": {
           "required": true,
           "content": {
@@ -245,13 +245,14 @@
               "username_recon",
               "reverse_image_search",
               "metadata_analysis",
-              "breach_exposure_check"
+              "breach_exposure_check",
+              "vehicle_recon"
             ],
             "description": "The OSINT workflow to execute"
           },
           "target": {
             "type": "string",
-            "description": "The indicator to analyze: domain, IP, email, phone, username, or URL"
+            "description": "The indicator to analyze: domain, IP, email, phone, username, URL, or license plate (e.g. 1234BCD)"
           },
           "mode": {
             "type": "string",
