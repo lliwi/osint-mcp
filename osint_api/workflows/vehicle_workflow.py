@@ -59,8 +59,7 @@ async def run(plate: str, country: str = "ES") -> OsintResult:
 
     # ── Identity ──────────────────────────────────────────────────────────────
     identity: dict = {}
-    for field in ("plate", "vin", "make", "model", "version",
-                  "commercial_name", "color", "body_type"):
+    for field in ("plate", "vin", "make", "model", "version", "color", "body_type", "country"):
         if v.get(field):
             identity[field] = v[field]
 
@@ -75,9 +74,7 @@ async def run(plate: str, country: str = "ES") -> OsintResult:
 
     # ── Engine & performance ──────────────────────────────────────────────────
     engine: dict = {}
-    for field in ("fuel_type", "engine_code", "engine_cc", "engine_liters",
-                  "power_kw", "power_hp", "fiscal_power",
-                  "gearbox", "num_gears", "max_speed_kmh"):
+    for field in ("fuel_type", "engine_code", "power_kw", "drivetrain", "injection"):
         if v.get(field):
             engine[field] = v[field]
 
@@ -89,45 +86,11 @@ async def run(plate: str, country: str = "ES") -> OsintResult:
             confidence=Confidence.high,
         ))
 
-    # ── Dimensions & capacity ─────────────────────────────────────────────────
-    dims: dict = {}
-    for field in ("num_doors", "num_seats", "length_mm", "width_mm",
-                  "height_mm", "max_weight_kg", "tyres"):
-        if v.get(field):
-            dims[field] = v[field]
-
-    if dims:
-        result.findings.append(Finding(
-            type="dimensions",
-            value=dims,
-            source="RapidAPI/DGT",
-            confidence=Confidence.high,
-        ))
-
-    # ── Emissions ─────────────────────────────────────────────────────────────
-    emissions: dict = {}
-    for field in ("co2_g_km", "euro_standard", "consumption_l100"):
-        if v.get(field):
-            emissions[field] = v[field]
-
-    if emissions:
-        result.findings.append(Finding(
-            type="emissions",
-            value=emissions,
-            source="RapidAPI/DGT",
-            confidence=Confidence.high,
-        ))
-
     # ── Registration dates ────────────────────────────────────────────────────
-    dates: dict = {}
-    for field in ("first_registration", "model_year_start", "model_year_end"):
-        if v.get(field):
-            dates[field] = v[field]
-
-    if dates:
+    if v.get("first_registration"):
         result.findings.append(Finding(
             type="registration_dates",
-            value=dates,
+            value={"first_registration": v["first_registration"]},
             source="RapidAPI/DGT",
             confidence=Confidence.high,
         ))
@@ -141,7 +104,7 @@ def _finalize(result: OsintResult, v: dict) -> None:
     result.confidence = Confidence.high
     make  = v.get("make", "")
     model = v.get("model", "")
-    year  = v.get("first_registration", v.get("model_year_start", ""))[:4]
+    year  = (v.get("first_registration") or "")[:4]
     color = v.get("color", "")
     desc  = " ".join(filter(None, [make, model, year, color])) or "unknown vehicle"
     result.summary = (

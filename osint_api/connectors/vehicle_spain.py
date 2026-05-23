@@ -96,74 +96,50 @@ async def lookup(query: str, query_type: str = "auto") -> dict:
     except Exception as exc:
         return {"available": False, "error": str(exc)}
 
-    # API-level errors
-    if payload.get("error"):
-        return {
-            "available": True,
-            "found": False,
-            "error": payload.get("message", "API error"),
-        }
-
-    data = payload.get("data", {})
-    if not data:
+    # API returns a list; empty list means not found
+    if not payload or (isinstance(payload, list) and len(payload) == 0):
         return {"available": True, "found": False, "query": query}
+
+    data = payload[0] if isinstance(payload, list) else payload
 
     return {
         "available": True,
         "found": True,
         "query": query,
         "query_type": query_type,
-        "source": "RapidAPI / Autoways (DGT)",
+        "source": "RapidAPI / DGT (api-license-plate-spain)",
         "vehicle_data": _normalize(data),
-        "raw": data,
+        "raw": payload,
     }
 
 
 def _normalize(data: dict) -> dict:
-    """Map Autoways AWN_ prefixed fields to a clean schema."""
+    """Map DGT/RapidAPI Spanish fields to internal schema."""
     return {
         # ── Identification ────────────────────────────────────────────────
-        "plate":           data.get("AWN_immat", ""),
-        "vin":             data.get("AWN_VIN", ""),
-        "make":            data.get("AWN_marque", ""),
-        "model":           data.get("AWN_modele", ""),
-        "version":         data.get("AWN_version", ""),
-        "commercial_name": data.get("AWN_nom_commercial", ""),
-        "label":           data.get("AWN_label", ""),
-        "color":           data.get("AWN_couleur", ""),
-        "body_type":       data.get("AWN_style_carrosserie", ""),
-        "platform_code":   data.get("AWN_code_platform", ""),
+        "plate":              data.get("MATRICULA", ""),
+        "vin":                data.get("VIN", ""),
+        "make":               data.get("MARCA", ""),
+        "model":              data.get("MODELO", ""),
+        "version":            data.get("TPMOTOR", ""),
+        "color":              data.get("COLOR", ""),
+        "body_type":          data.get("CARROCERIA", ""),
+        "country":            data.get("PAIS", ""),
 
         # ── Engine & Performance ──────────────────────────────────────────
-        "fuel_type":       data.get("AWN_energie", ""),
-        "engine_code":     data.get("AWN_code_moteur", ""),
-        "engine_cc":       data.get("AWN_cylindre_capacite", ""),
-        "engine_liters":   data.get("AWN_cylindree_liters", ""),
-        "power_kw":        data.get("AWN_puissance_KW", ""),
-        "power_hp":        data.get("AWN_puissance_chevaux", ""),
-        "fiscal_power":    data.get("AWN_puissance_fiscale", ""),
-        "gearbox":         data.get("AWN_type_boite_vites", ""),
-        "num_gears":       data.get("AWN_nbr_vitesses", ""),
-        "max_speed_kmh":   data.get("AWN_max_speed", ""),
-
-        # ── Dimensions & Capacity ─────────────────────────────────────────
-        "num_doors":       data.get("AWN_nbr_portes", ""),
-        "num_seats":       data.get("AWN_nbr_places", ""),
-        "length_mm":       data.get("AWN_longueur", ""),
-        "width_mm":        data.get("AWN_largeur", ""),
-        "height_mm":       data.get("AWN_hauteur", ""),
-        "max_weight_kg":   data.get("AWN_PTAC", ""),
-
-        # ── Emissions ─────────────────────────────────────────────────────
-        "co2_g_km":        data.get("AWN_emission_co_2", ""),
-        "euro_standard":   data.get("AWN_norme_euro_standardise", ""),
-        "consumption_l100":data.get("AWN_consommation_mixte", ""),
-
-        # ── Tyres ─────────────────────────────────────────────────────────
-        "tyres":           data.get("AWN_pneus", ""),
+        "fuel_type":          data.get("TYMOTOR", ""),
+        "engine_code":        data.get("MOTOR", ""),
+        "power_kw":           data.get("KWs", ""),
+        "drivetrain":         data.get("TRACCION", ""),
+        "injection":          data.get("INYECCION", ""),
 
         # ── Dates ─────────────────────────────────────────────────────────
-        "first_registration": data.get("AWN_date_mise_en_circulation", ""),
-        "model_year_start":   data.get("AWN_annee_de_debut_modele", ""),
-        "model_year_end":     data.get("AWN_annee_de_fin_modele", ""),
+        "first_registration": data.get("FECHA_MATRICULACION", ""),
+
+        # ── TecDoc IDs ────────────────────────────────────────────────────
+        "tecdoc_ktype":       data.get("ID_KTYPE", ""),
+        "brand_id":           data.get("IDMARCA", ""),
+        "model_id":           data.get("IDMODELO", ""),
+        "tecdoc_brand_id":    data.get("ID_MARCA_TECDOC", ""),
+        "tecdoc_model_id":    data.get("ID_MODELO_TECDOC", ""),
     }
