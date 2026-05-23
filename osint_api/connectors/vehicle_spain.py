@@ -30,8 +30,9 @@ def _available() -> bool:
 
 def _headers() -> dict:
     return {
-        "X-RapidAPI-Key":  _key(),
-        "X-RapidAPI-Host": _HOST,
+        "x-rapidapi-key":  _key(),
+        "x-rapidapi-host": _HOST,
+        "Content-Type":    "application/json",
     }
 
 
