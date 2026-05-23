@@ -1,10 +1,10 @@
 """
-Spanish vehicle lookup via RapidAPI — Autoways / DGT API.
+Spanish vehicle lookup via RapidAPI — License Plate Spain API.
 Supports Spanish license plate (matrícula) and VIN (bastidor).
 
-API: api-license-plate-spain-matricula-api-espana (RapidAPI / Autoways)
-Host: api-license-plate-spain-matricula-api-espana.p.rapidapi.com
-Docs: https://rapidapi.com/autoways/api/api-license-plate-spain-matricula-api-espana
+API: api-license-plate-spain (RapidAPI)
+Host: api-license-plate-spain.p.rapidapi.com
+Endpoint: GET /es?plate=1234BCD
 """
 from __future__ import annotations
 
@@ -12,8 +12,8 @@ import re
 import os
 import httpx
 
-_HOST = "api-license-plate-spain-matricula-api-espana.p.rapidapi.com"
-_URL  = f"https://{_HOST}/"
+_HOST = "api-license-plate-spain.p.rapidapi.com"
+_URL  = f"https://{_HOST}/es"
 
 _PLATE_MODERN = re.compile(r"^[0-9]{4}[A-Z]{3}$")
 _PLATE_OLD    = re.compile(r"^[A-Z]{1,2}[0-9]{4}[A-Z]{2}$")
@@ -71,9 +71,9 @@ async def lookup(query: str, query_type: str = "auto") -> dict:
     if not _available():
         return {"available": False, "reason": "RAPIDAPI_KEY not configured"}
 
-    params = {"country": "es"}
+    params = {}
     if query_type == "plate":
-        params["plaque"] = query
+        params["plate"] = query
     else:
         params["vin"] = query
 

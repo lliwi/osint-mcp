@@ -21,7 +21,7 @@ async def run(plate: str, country: str = "ES") -> OsintResult:
         target_type=TargetType.domain,  # closest available generic type
         status=TaskStatus.running,
         warnings=[
-            "Vehicle data from public DGT records via RapidAPI (Autoways).",
+            "Vehicle data from public DGT records via RapidAPI (License Plate Spain).",
         ],
     )
 
@@ -50,8 +50,8 @@ async def run(plate: str, country: str = "ES") -> OsintResult:
         return result
 
     result.sources.append(Source(
-        name="RapidAPI / Autoways (DGT)",
-        url="https://rapidapi.com/autoways/api/api-license-plate-spain-matricula-api-espana",
+        name="RapidAPI / License Plate Spain (DGT)",
+        url="https://rapidapi.com/api/api-license-plate-spain",
         success=True,
     ))
 
@@ -68,7 +68,7 @@ async def run(plate: str, country: str = "ES") -> OsintResult:
         result.findings.append(Finding(
             type="vehicle_identity",
             value=identity,
-            source="Autoways/DGT",
+            source="RapidAPI/DGT",
             confidence=Confidence.high,
             notes=f"{v.get('make', '')} {v.get('model', '')} — {v.get('color', '')}".strip(),
         ))
@@ -85,7 +85,7 @@ async def run(plate: str, country: str = "ES") -> OsintResult:
         result.findings.append(Finding(
             type="engine",
             value=engine,
-            source="Autoways/DGT",
+            source="RapidAPI/DGT",
             confidence=Confidence.high,
         ))
 
@@ -100,7 +100,7 @@ async def run(plate: str, country: str = "ES") -> OsintResult:
         result.findings.append(Finding(
             type="dimensions",
             value=dims,
-            source="Autoways/DGT",
+            source="RapidAPI/DGT",
             confidence=Confidence.high,
         ))
 
@@ -114,7 +114,7 @@ async def run(plate: str, country: str = "ES") -> OsintResult:
         result.findings.append(Finding(
             type="emissions",
             value=emissions,
-            source="Autoways/DGT",
+            source="RapidAPI/DGT",
             confidence=Confidence.high,
         ))
 
@@ -128,7 +128,7 @@ async def run(plate: str, country: str = "ES") -> OsintResult:
         result.findings.append(Finding(
             type="registration_dates",
             value=dates,
-            source="Autoways/DGT",
+            source="RapidAPI/DGT",
             confidence=Confidence.high,
         ))
 
