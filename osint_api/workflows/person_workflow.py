@@ -38,9 +38,9 @@ async def run(
         result.confidence = Confidence.low
         result.risk = Risk.low
         result.summary = (
-            f"Insufficient data to search for '{name}'. "
-            "PDL requires name + at least one of: company, location, email or phone. "
-            "Provide these via the options field."
+            f"Cannot search for '{name}' without extra context. "
+            "Retry with options={{\"location\":\"city\"}} or options={{\"company\":\"employer\"}}. "
+            "PDL requires name + location or company to return results."
         )
         return result
 

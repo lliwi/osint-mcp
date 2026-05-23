@@ -253,7 +253,7 @@
           },
           "target": {
             "type": "string",
-            "description": "Indicator to analyze. For username_recon: full name (e.g. 'John Smith'), email, username, LinkedIn URL, GitHub URL or phone are all valid targets."
+            "description": "Indicator to analyze: domain, IP, email, phone, username, URL, plate or VIN. For person_recon: ONLY the person's full name (e.g. 'John Smith'). Put city/company in options, NOT in this field."
           },
           "mode": {
             "type": "string",
@@ -267,8 +267,9 @@
           },
           "options": {
             "type": "object",
-            "description": "Extra params: depth (domain_recon), country_hint (phone_reputation), indicator_type (breach), platform_scope (username_recon), country (vehicle_recon). For person_recon: company, location, email, phone.",
-            "additionalProperties": true
+            "description": "Extra params per workflow. For person_recon ALWAYS pass location and/or company here, example: {\"location\":\"Barcelona\",\"company\":\"Acme\"}. Other workflows: depth (domain_recon), country_hint (phone), indicator_type (breach), country (vehicle_recon).",
+            "additionalProperties": true,
+            "example": {"location": "Barcelona", "company": "Acme Corp"}
           }
         }
       },
