@@ -252,7 +252,7 @@
           },
           "target": {
             "type": "string",
-            "description": "The indicator to analyze: domain, IP, email, phone, username, URL, Spanish license plate (e.g. 1234BCD) or VIN (17 chars). For person research: use email, username, LinkedIn URL (linkedin.com/in/...), GitHub URL or phone."
+            "description": "Indicator to analyze. For username_recon: full name (e.g. 'John Smith'), email, username, LinkedIn URL, GitHub URL or phone are all valid targets."
           },
           "mode": {
             "type": "string",
