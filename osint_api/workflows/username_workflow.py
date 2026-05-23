@@ -1,4 +1,5 @@
 from __future__ import annotations
+import re
 
 from mcp_server.schemas.common import (
     Confidence, Entity, Finding, OsintResult, Risk, Source, TargetType, TaskStatus,
@@ -8,8 +9,16 @@ from osint_api.parsers import sherlock_parser
 from osint_api.runners.cli_runner import run_cli_tool
 from osint_api.security.validator import validate_username
 
+_FULL_NAME_RE = re.compile(r"^[A-Za-zÀ-ÖØ-öø-ÿ]+([\s'\-][A-Za-zÀ-ÖØ-öø-ÿ]+)+$")
+
+
+def _is_full_name(value: str) -> bool:
+    return bool(_FULL_NAME_RE.match(value.strip()))
+
 
 async def run(username: str, platform_scope: str = "all") -> OsintResult:
+    if _is_full_name(username):
+        return await _run_name_search(username.strip())
     username = validate_username(username)
     result = OsintResult(
         workflow="username_recon",
@@ -213,6 +222,115 @@ async def run(username: str, platform_scope: str = "all") -> OsintResult:
             )
 
     _finalize(result)
+    return result
+
+
+async def _run_name_search(name: str) -> OsintResult:
+    result = OsintResult(
+        workflow="username_recon",
+        target=name,
+        target_type=TargetType.username,
+        status=TaskStatus.running,
+        warnings=["Name-based search: results depend on public data availability."],
+    )
+
+    # ── People Data Labs by name ──────────────────────────────────────────────
+    pdl = await peopledatalabs.enrich_by_name(name)
+    if pdl.get("available") and pdl.get("found"):
+        result.sources.append(Source(name="PeopleDataLabs", url="https://www.peopledatalabs.com"))
+        likelihood = pdl.get("likelihood", 0)
+        likelihood_pct = pdl.get("likelihood_pct", 0)
+        conf = Confidence.high if likelihood >= 7 else Confidence.medium
+
+        for field in ("full_name", "gender", "birth_year", "industry", "summary"):
+            if pdl.get(field):
+                result.findings.append(Finding(
+                    type=field, value=pdl[field], source="PeopleDataLabs", confidence=conf,
+                ))
+        if pdl.get("job_title") or pdl.get("job_company_name"):
+            result.findings.append(Finding(
+                type="current_job",
+                value={
+                    "title":   pdl.get("job_title", ""),
+                    "company": pdl.get("job_company_name", ""),
+                    "website": pdl.get("job_company_website", ""),
+                },
+                source="PeopleDataLabs", confidence=conf,
+            ))
+        if pdl.get("experience"):
+            result.findings.append(Finding(
+                type="work_history", value=pdl["experience"],
+                source="PeopleDataLabs", confidence=conf,
+            ))
+        if pdl.get("education"):
+            result.findings.append(Finding(
+                type="education", value=pdl["education"],
+                source="PeopleDataLabs", confidence=conf,
+            ))
+        if pdl.get("locations"):
+            result.findings.append(Finding(
+                type="locations", value=pdl["locations"],
+                source="PeopleDataLabs", confidence=conf,
+            ))
+        if pdl.get("profiles"):
+            result.findings.append(Finding(
+                type="pdl_social_profiles", value=pdl["profiles"],
+                source="PeopleDataLabs", confidence=conf,
+                notes=f"{len(pdl['profiles'])} perfiles encontrados",
+            ))
+            for p in pdl["profiles"]:
+                if p.get("url"):
+                    result.entities.append(Entity(
+                        type="social_profile",
+                        value=p["url"],
+                        attributes={"platform": p["network"], "username": p.get("username", "")},
+                    ))
+        if pdl.get("social_links"):
+            result.findings.append(Finding(
+                type="pdl_social_links", value=pdl["social_links"],
+                source="PeopleDataLabs", confidence=Confidence.high,
+            ))
+        if pdl.get("skills"):
+            result.findings.append(Finding(
+                type="skills", value=pdl["skills"],
+                source="PeopleDataLabs", confidence=Confidence.medium,
+            ))
+        if pdl.get("known_email_domains"):
+            result.findings.append(Finding(
+                type="known_email_domains", value=pdl["known_email_domains"],
+                source="PeopleDataLabs", confidence=Confidence.medium,
+            ))
+        if pdl.get("work_email_hint"):
+            result.findings.append(Finding(
+                type="work_email_hint", value=pdl["work_email_hint"],
+                source="PeopleDataLabs", confidence=Confidence.medium,
+            ))
+        result.findings.append(Finding(
+            type="pdl_likelihood",
+            value={"score": likelihood, "percent": likelihood_pct,
+                   "matched_fields": pdl.get("matched_fields", [])},
+            source="PeopleDataLabs", confidence=Confidence.high,
+        ))
+    elif not pdl.get("available"):
+        result.warnings.append(f"PeopleDataLabs unavailable: {pdl.get('reason') or pdl.get('error')}")
+
+    # ── Intelligence X ────────────────────────────────────────────────────────
+    intelx = await intelligencex.search(name, max_results=10)
+    if intelx.get("available") and intelx.get("found"):
+        result.sources.append(Source(name="IntelligenceX", url="https://intelx.io"))
+        result.findings.append(Finding(
+            type="intelx_mentions", value=intelx["results"], source="IntelligenceX",
+            confidence=Confidence.medium,
+            notes=f"{intelx.get('total_found', 0)} mentions found",
+        ))
+
+    result.risk = Risk.low
+    result.confidence = Confidence.high if result.sources else Confidence.low
+    result.summary = (
+        f"Person search for '{name}': "
+        f"{len(result.findings)} findings across {len(result.sources)} sources."
+    )
+    result.status = TaskStatus.completed
     return result
 
 

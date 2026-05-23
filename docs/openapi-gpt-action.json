@@ -84,7 +84,7 @@
       "post": {
         "operationId": "runOsintWorkflow",
         "summary": "Launch an OSINT workflow",
-        "description": "Starts an OSINT workflow. Returns task_id; poll GET /tasks/{task_id}. Pick by type: email=email_reputation, domain=domain_recon, ip=ip_reputation, phone=phone_reputation, username=username_recon, breach=breach_exposure_check, plate/VIN=vehicle_recon.",
+        "description": "Launch OSINT workflow; poll GET /tasks/{task_id}. Map: email->email_reputation, domain->domain_recon, ip->ip_reputation, phone->phone_reputation, person/username->username_recon, breach->breach_exposure_check, plate/VIN->vehicle_recon. Person research: use email, username or LinkedIn URL.",
         "requestBody": {
           "required": true,
           "content": {
@@ -252,7 +252,7 @@
           },
           "target": {
             "type": "string",
-            "description": "The indicator to analyze: domain, IP, email, phone, username, URL, Spanish license plate (e.g. 1234BCD) or VIN (17 chars)"
+            "description": "The indicator to analyze: domain, IP, email, phone, username, URL, Spanish license plate (e.g. 1234BCD) or VIN (17 chars). For person research: use email, username, LinkedIn URL (linkedin.com/in/...), GitHub URL or phone."
           },
           "mode": {
             "type": "string",
