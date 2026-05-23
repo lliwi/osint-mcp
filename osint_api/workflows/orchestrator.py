@@ -35,10 +35,15 @@ _TYPE_WORKFLOW_MAP: dict[str, list[str]] = {
 def _wrap(fn, *param_names):
     """Bind a workflow coroutine to WorkflowRequest fields."""
     async def _runner(req: WorkflowRequest) -> OsintResult:
-        kwargs = {name: req.options.get(name, req.target if i == 0 else "")
-                  for i, name in enumerate(param_names)}
-        # First positional always maps to target
-        kwargs[param_names[0]] = req.target
+        kwargs = {}
+        for i, name in enumerate(param_names):
+            if i == 0:
+                kwargs[name] = req.target
+            else:
+                # Prefer top-level flat field (GPT Actions sends these directly),
+                # fall back to options dict for backward compatibility
+                top_val = getattr(req, name, "")
+                kwargs[name] = top_val or req.options.get(name, "")
         return await fn(**kwargs)
     return _runner
 
