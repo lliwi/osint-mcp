@@ -124,7 +124,7 @@ async def _enrich(params: dict, min_likelihood: int = 2) -> dict:
                 params=payload,
                 headers=_headers(),
             )
-            if resp.status_code == 404:
+            if resp.status_code in (400, 404):
                 return {"available": True, "found": False}
             if resp.status_code == 401:
                 return {"available": False, "error": "Invalid PDL API key or no permissions"}

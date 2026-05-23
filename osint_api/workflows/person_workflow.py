@@ -32,12 +32,17 @@ async def run(
         status=TaskStatus.running,
     )
 
-    if not company and not location and not email and not phone:
-        result.warnings.append(
-            "No company, location, email or phone provided. "
-            "PDL match quality will be low (likelihood 2-5). "
-            "Add company or location via options for better results."
+    has_extra = bool(company or location or email or phone)
+    if not has_extra:
+        result.status = TaskStatus.failed
+        result.confidence = Confidence.low
+        result.risk = Risk.low
+        result.summary = (
+            f"Insufficient data to search for '{name}'. "
+            "PDL requires name + at least one of: company, location, email or phone. "
+            "Provide these via the options field."
         )
+        return result
 
     # ── People Data Labs ──────────────────────────────────────────────────────
     pdl = None
