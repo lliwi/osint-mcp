@@ -182,9 +182,9 @@ def _process_response(raw: dict) -> dict:
         if data.get(field):
             social_links[field] = data[field]
 
-    # ── Employment (last 5) ───────────────────────────────────────────────────
+    # ── Employment ───────────────────────────────────────────────────────────
     experience = []
-    for exp in _as_list(data.get("experience"))[:5]:
+    for exp in _as_list(data.get("experience")):
         company_info = exp.get("company")
         company_info = company_info if isinstance(company_info, dict) else {}
         title_info = exp.get("title")
@@ -200,9 +200,9 @@ def _process_response(raw: dict) -> dict:
             "type":         exp.get("type") or "",
         })
 
-    # ── Locations (top 3) ─────────────────────────────────────────────────────
+    # ── Locations ─────────────────────────────────────────────────────────────
     locations = []
-    for loc in _as_list(data.get("locations"))[:3]:
+    for loc in _as_list(data.get("locations")):
         locations.append({
             "name":       loc.get("name") or "",
             "locality":   loc.get("locality") or "",
@@ -213,15 +213,18 @@ def _process_response(raw: dict) -> dict:
 
     # ── Emails & phones (domain-only for privacy) ─────────────────────────────
     # Full addresses kept internally but domain only exposed in findings
+    # PDL may return True (bool) instead of "" for missing string fields — guard with isinstance
     raw_emails = [
-        e.get("address", "")
+        e["address"]
         for e in _as_list(data.get("emails"))
-        if e.get("address")
+        if isinstance(e.get("address"), str) and e["address"]
     ]
     known_email_domains = list({
         addr.split("@")[-1] for addr in raw_emails if "@" in addr
     })
     work_email = data.get("work_email", "")
+    if not isinstance(work_email, str):
+        work_email = ""
     work_email_hint = ""
     if work_email and "@" in work_email:
         local = work_email.split("@")[0]
@@ -234,9 +237,9 @@ def _process_response(raw: dict) -> dict:
         if p.get("number")
     ]
 
-    # ── Education (last 3) ────────────────────────────────────────────────────
+    # ── Education ────────────────────────────────────────────────────────────
     education = []
-    for edu in _as_list(data.get("education"))[:3]:
+    for edu in _as_list(data.get("education")):
         school_info = edu.get("school")
         school_info = school_info if isinstance(school_info, dict) else {}
         education.append({
@@ -277,9 +280,9 @@ def _process_response(raw: dict) -> dict:
         "work_email_hint": work_email_hint,
         "phone_count":     len(raw_phones),   # count only, not numbers
         # Skills & languages
-        "skills":          (_as_list(data.get("skills")) or [])[:15],
+        "skills":          _as_list(data.get("skills")) or [],
         "languages":       [
             lg.get("name", lg) if isinstance(lg, dict) else lg
-            for lg in _as_list(data.get("languages"))[:5]
+            for lg in _as_list(data.get("languages"))
         ],
     }
