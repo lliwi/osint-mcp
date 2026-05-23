@@ -32,7 +32,6 @@ def _headers() -> dict:
     return {
         "x-rapidapi-key":  _key(),
         "x-rapidapi-host": _HOST,
-        "Content-Type":    "application/json",
     }
 
 
@@ -86,7 +85,7 @@ async def lookup(query: str, query_type: str = "auto") -> dict:
                 return {"available": False, "error": "Invalid RapidAPI key or no active subscription"}
             if resp.status_code == 429:
                 return {"available": False, "error": "RapidAPI rate limit exceeded"}
-            if resp.status_code == 404:
+            if resp.status_code in (400, 404):
                 return {"available": True, "found": False, "query": query}
 
             resp.raise_for_status()
