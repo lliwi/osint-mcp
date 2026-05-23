@@ -265,11 +265,30 @@
             "enum": ["json", "markdown"],
             "default": "json"
           },
+          "location": {
+            "type": "string",
+            "description": "For person_recon: city or region where the person lives (e.g. 'Barcelona', 'Viladecans').",
+            "default": ""
+          },
+          "company": {
+            "type": "string",
+            "description": "For person_recon: company or employer name.",
+            "default": ""
+          },
+          "email": {
+            "type": "string",
+            "description": "For person_recon: known email address.",
+            "default": ""
+          },
+          "phone": {
+            "type": "string",
+            "description": "For person_recon: known phone number.",
+            "default": ""
+          },
           "options": {
             "type": "object",
-            "description": "Extra params per workflow. For person_recon ALWAYS pass location and/or company here, example: {\"location\":\"Barcelona\",\"company\":\"Acme\"}. Other workflows: depth (domain_recon), country_hint (phone), indicator_type (breach), country (vehicle_recon).",
-            "additionalProperties": true,
-            "example": {"location": "Barcelona", "company": "Acme Corp"}
+            "description": "Extra params: depth (domain_recon), country_hint (phone_reputation), indicator_type (breach), platform_scope (username_recon), country (vehicle_recon).",
+            "additionalProperties": true
           }
         }
       },

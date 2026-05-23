@@ -101,7 +101,19 @@ class WorkflowRequest(BaseModel):
     target: str
     mode: str = "safe"
     output_format: str = "json"
+    # Flat fields for person_recon (GPT Actions doesn't support nested objects)
+    location: str = ""
+    company: str = ""
+    email: str = ""
+    phone: str = ""
     options: dict[str, Any] = Field(default_factory=dict)
+
+    def model_post_init(self, __context: Any) -> None:
+        # Merge flat fields into options so orchestrator can read them uniformly
+        for key in ("location", "company", "email", "phone"):
+            val = getattr(self, key, "")
+            if val and key not in self.options:
+                self.options[key] = val
 
 
 class ReportRequest(BaseModel):
