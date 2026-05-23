@@ -32,6 +32,7 @@ def _headers() -> dict:
     return {
         "x-rapidapi-key":  _key(),
         "x-rapidapi-host": _HOST,
+        "Content-Type":    "application/json",
     }
 
 
