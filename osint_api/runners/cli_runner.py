@@ -88,7 +88,14 @@ async def run_cli_tool(
             stdout=stdout_b.decode("utf-8", errors="replace"),
             stderr=stderr_b.decode("utf-8", errors="replace"),
         )
-        logger.debug("Tool '%s' finished rc=%d", tool_name, result.returncode)
+        if result.returncode not in (0, -1):
+            logger.warning(
+                "Tool '%s' exited rc=%d | stderr: %s",
+                tool_name, result.returncode,
+                result.stderr[:500] if result.stderr else "(empty)",
+            )
+        else:
+            logger.debug("Tool '%s' finished rc=%d", tool_name, result.returncode)
         return result
 
     except FileNotFoundError:

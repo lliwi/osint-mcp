@@ -20,7 +20,7 @@ async def run(username: str, platform_scope: str = "all") -> OsintResult:
 
     # ── Sherlock ───────────────────────────────────────────────────────────────
     args = ["--print-found", "--no-color", "--timeout", "10", username]
-    if platform_scope != "all":
+    if platform_scope and platform_scope != "all":
         args = ["--site", platform_scope, *args]
 
     sherlock_run = await run_cli_tool("sherlock", args)
