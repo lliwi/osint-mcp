@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 from dataclasses import dataclass
 
 from osint_api.security.allowlist import get_tool_config, is_tool_allowed, validate_args
@@ -64,11 +65,12 @@ async def run_cli_tool(
     logger.info("Running: %s (timeout=%ss)", " ".join(cmd), effective_timeout)
 
     try:
+        merged_env = {**os.environ, **env} if env else None
         proc = await asyncio.create_subprocess_exec(
             *cmd,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
-            env=env,
+            env=merged_env,
         )
         try:
             stdout_b, stderr_b = await asyncio.wait_for(

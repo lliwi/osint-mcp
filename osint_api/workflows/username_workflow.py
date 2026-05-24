@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import shutil
+import uuid
+
 from mcp_server.schemas.common import (
     Confidence, Entity, Finding, OsintResult, Risk, Source, TargetType, TaskStatus,
 )
@@ -19,11 +22,14 @@ async def run(username: str, platform_scope: str = "all") -> OsintResult:
     )
 
     # ── Sherlock ───────────────────────────────────────────────────────────────
-    args = ["--print-found", "--no-color", "--timeout", "10", username]
+    sherlock_folder = f"/tmp/sherlock-{uuid.uuid4().hex[:8]}"
+    args = ["--print-found", "--no-color", "--timeout", "10",
+            "--folderoutput", sherlock_folder, username]
     if platform_scope and platform_scope != "all":
         args = ["--site", platform_scope, *args]
 
     sherlock_run = await run_cli_tool("sherlock", args)
+    shutil.rmtree(sherlock_folder, ignore_errors=True)
     if sherlock_run.stdout:
         parsed = sherlock_parser.parse(sherlock_run.stdout)
         result.sources.append(Source(name="sherlock", success=sherlock_run.returncode == 0))
@@ -36,11 +42,16 @@ async def run(username: str, platform_scope: str = "all") -> OsintResult:
             ))
 
     # ── Maigret ───────────────────────────────────────────────────────────────
-    # Note: --json writes to a report file (fails in read-only container).
-    # Parse text output instead — same [+] Platform: URL format as Sherlock.
+    # Both --folderoutput and HOME=/tmp are needed to avoid writes to the
+    # read-only filesystem (reports dir + ~/.maigret/ cache).
+    maigret_folder = f"/tmp/maigret-{uuid.uuid4().hex[:8]}"
     maigret_run = await run_cli_tool(
-        "maigret", ["--no-color", "--top-sites", "500", "--timeout", "10", username]
+        "maigret",
+        ["--no-color", "--top-sites", "500", "--timeout", "10",
+         "--folderoutput", maigret_folder, username],
+        env={"HOME": "/tmp"},
     )
+    shutil.rmtree(maigret_folder, ignore_errors=True)
     if maigret_run.stdout and not maigret_run.timed_out:
         parsed_m = sherlock_parser.parse(maigret_run.stdout)
         result.sources.append(Source(name="maigret", success=maigret_run.returncode == 0))
