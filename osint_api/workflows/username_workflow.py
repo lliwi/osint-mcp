@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import shutil
 import uuid
 
@@ -21,15 +22,27 @@ async def run(username: str, platform_scope: str = "all") -> OsintResult:
         status=TaskStatus.running,
     )
 
-    # ── Sherlock ───────────────────────────────────────────────────────────────
+    # ── Sherlock + Maigret (parallel) ─────────────────────────────────────────
+    # Run both concurrently to keep total scan time under ~15s.
+    # --folderoutput + HOME=/tmp redirect all file writes to the writable tmpfs.
     sherlock_folder = f"/tmp/sherlock-{uuid.uuid4().hex[:8]}"
-    args = ["--print-found", "--no-color", "--timeout", "10",
-            "--folderoutput", sherlock_folder, username]
-    if platform_scope and platform_scope != "all":
-        args = ["--site", platform_scope, *args]
+    maigret_folder  = f"/tmp/maigret-{uuid.uuid4().hex[:8]}"
 
-    sherlock_run = await run_cli_tool("sherlock", args)
+    sherlock_args = ["--print-found", "--no-color", "--timeout", "5",
+                     "--folderoutput", sherlock_folder, username]
+    if platform_scope and platform_scope != "all":
+        sherlock_args = ["--site", platform_scope, *sherlock_args]
+
+    maigret_args = ["--no-color", "--top-sites", "300", "--timeout", "5",
+                    "--folderoutput", maigret_folder, username]
+
+    sherlock_run, maigret_run = await asyncio.gather(
+        run_cli_tool("sherlock", sherlock_args),
+        run_cli_tool("maigret", maigret_args, env={"HOME": "/tmp"}),
+    )
     shutil.rmtree(sherlock_folder, ignore_errors=True)
+    shutil.rmtree(maigret_folder,  ignore_errors=True)
+
     if sherlock_run.stdout:
         parsed = sherlock_parser.parse(sherlock_run.stdout)
         result.sources.append(Source(name="sherlock", success=sherlock_run.returncode == 0))
@@ -41,17 +54,6 @@ async def run(username: str, platform_scope: str = "all") -> OsintResult:
                 notes=f"{len(profiles)} profiles found",
             ))
 
-    # ── Maigret ───────────────────────────────────────────────────────────────
-    # Both --folderoutput and HOME=/tmp are needed to avoid writes to the
-    # read-only filesystem (reports dir + ~/.maigret/ cache).
-    maigret_folder = f"/tmp/maigret-{uuid.uuid4().hex[:8]}"
-    maigret_run = await run_cli_tool(
-        "maigret",
-        ["--no-color", "--top-sites", "500", "--timeout", "10",
-         "--folderoutput", maigret_folder, username],
-        env={"HOME": "/tmp"},
-    )
-    shutil.rmtree(maigret_folder, ignore_errors=True)
     if maigret_run.stdout and not maigret_run.timed_out:
         parsed_m = sherlock_parser.parse(maigret_run.stdout)
         result.sources.append(Source(name="maigret", success=maigret_run.returncode == 0))
