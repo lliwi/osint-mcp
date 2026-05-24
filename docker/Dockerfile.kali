@@ -16,6 +16,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     wget \
     libimage-exiftool-perl \
+    libmagic1 \
     mat2 \
     poppler-utils \
     file \

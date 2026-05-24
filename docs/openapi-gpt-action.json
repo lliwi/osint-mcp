@@ -80,6 +80,45 @@
         }
       }
     },
+    "/files/upload": {
+      "post": {
+        "operationId": "uploadFile",
+        "summary": "Upload a file for analysis",
+        "description": "Upload image or document (PDF/Office/ODF). Returns path to pass as target in reverse_image_search or metadata_analysis. File is deleted automatically after analysis completes.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": ["file"],
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "File to analyse. Allowed: JPEG, PNG, WebP, GIF, TIFF, BMP, HEIC, PDF, DOC, DOCX, XLS, XLSX, PPT, PPTX, ODT, ODS, ODP. Max 20 MB."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "File uploaded. Use path as target in the workflow.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadResponse"
+                }
+              }
+            }
+          },
+          "413": {"description": "File exceeds 20 MB limit"},
+          "415": {"description": "File type not allowed"}
+        }
+      }
+    },
     "/workflow/run": {
       "post": {
         "operationId": "runOsintWorkflow",
@@ -253,7 +292,7 @@
           },
           "target": {
             "type": "string",
-            "description": "Indicator to analyze: domain, IP, email, phone, username, URL, plate or VIN. For person_recon: ONLY the person's full name (e.g. 'John Smith'). Put city/company in options, NOT in this field."
+            "description": "Indicator to analyze: domain, IP, email, phone, username, URL, plate or VIN. For person_recon: ONLY full name. For reverse_image_search/metadata_analysis: path returned by POST /files/upload."
           },
           "mode": {
             "type": "string",
@@ -379,6 +418,16 @@
           "url": {"type": "string"},
           "queried_at": {"type": "string"},
           "success": {"type": "boolean"}
+        }
+      },
+      "UploadResponse": {
+        "type": "object",
+        "required": ["file_id", "path"],
+        "properties": {
+          "file_id": {"type": "string", "description": "UUID filename assigned by the server"},
+          "path": {"type": "string", "description": "Pass this as target in reverse_image_search or metadata_analysis"},
+          "mime_type": {"type": "string"},
+          "size_bytes": {"type": "integer"}
         }
       },
       "ReportFormatRequest": {

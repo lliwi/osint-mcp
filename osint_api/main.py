@@ -7,8 +7,10 @@ from __future__ import annotations
 import logging
 import os
 from contextlib import asynccontextmanager
+from uuid import uuid4
 
-from fastapi import Depends, FastAPI, HTTPException, Request, Security
+import magic
+from fastapi import Depends, FastAPI, File, HTTPException, Request, Security, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security.api_key import APIKeyHeader
 from pydantic import BaseModel
@@ -28,6 +30,30 @@ logger = logging.getLogger(__name__)
 
 _API_KEY = os.getenv("OSINT_INTERNAL_API_KEY", "changeme")
 _api_key_header = APIKeyHeader(name="X-OSINT-API-Key", auto_error=True)
+
+_UPLOAD_DIR = os.getenv("UPLOAD_DIR", "/tmp/osint-uploads")
+_MAX_UPLOAD_BYTES = int(os.getenv("MAX_UPLOAD_BYTES", str(20 * 1024 * 1024)))  # 20 MB
+
+_ALLOWED_MIME_TYPES: dict[str, str] = {
+    "image/jpeg":    ".jpg",
+    "image/png":     ".png",
+    "image/webp":    ".webp",
+    "image/gif":     ".gif",
+    "image/tiff":    ".tiff",
+    "image/bmp":     ".bmp",
+    "image/heic":    ".heic",
+    "image/heif":    ".heif",
+    "application/pdf": ".pdf",
+    "application/msword": ".doc",
+    "application/vnd.ms-excel": ".xls",
+    "application/vnd.ms-powerpoint": ".ppt",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document":   ".docx",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":         ".xlsx",
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation": ".pptx",
+    "application/vnd.oasis.opendocument.text":         ".odt",
+    "application/vnd.oasis.opendocument.spreadsheet":  ".ods",
+    "application/vnd.oasis.opendocument.presentation": ".odp",
+}
 
 
 async def require_api_key(key: str = Security(_api_key_header)) -> str:
@@ -91,6 +117,42 @@ async def import_tools(req: ImportRequest):
     return {"imported": len(imported), "tools": [t.name for t in imported]}
 
 
+# ─── File upload ─────────────────────────────────────────────────────────────
+
+@app.post("/files/upload", dependencies=[Depends(require_api_key)])
+async def upload_file(file: UploadFile = File(...)):
+    data = await file.read(_MAX_UPLOAD_BYTES + 1)
+    if len(data) > _MAX_UPLOAD_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail=f"File too large. Maximum allowed: {_MAX_UPLOAD_BYTES // (1024 * 1024)} MB.",
+        )
+
+    # Validate MIME from magic bytes — never trust the client-supplied Content-Type
+    mime = magic.from_buffer(data, mime=True)
+    if mime not in _ALLOWED_MIME_TYPES:
+        raise HTTPException(
+            status_code=415,
+            detail=f"File type '{mime}' is not allowed. Accepted: images, PDF, Office, ODF.",
+        )
+
+    ext = _ALLOWED_MIME_TYPES[mime]
+    file_id = f"{uuid4()}{ext}"
+    dest = os.path.join(_UPLOAD_DIR, file_id)
+
+    os.makedirs(_UPLOAD_DIR, exist_ok=True)
+    with open(dest, "wb") as fh:
+        fh.write(data)
+
+    logger.info("File uploaded: %s (%s, %d bytes)", file_id, mime, len(data))
+    return {
+        "file_id": file_id,
+        "path": dest,
+        "mime_type": mime,
+        "size_bytes": len(data),
+    }
+
+
 # ─── Workflows ────────────────────────────────────────────────────────────────
 
 @app.post("/workflow/run", dependencies=[Depends(require_api_key)])
@@ -117,6 +179,22 @@ async def _run_workflow_bg(task_id: str, req: WorkflowRequest) -> None:
     except Exception as exc:
         logger.exception("Workflow '%s' failed for task %s", req.workflow, task_id)
         await task_store.fail(task_id, str(exc))
+    finally:
+        _delete_upload(req.target)
+
+
+def _delete_upload(path: str) -> None:
+    """Delete file if it was placed in UPLOAD_DIR by the upload endpoint."""
+    if not path:
+        return
+    upload_dir = os.path.abspath(_UPLOAD_DIR)
+    try:
+        abs_path = os.path.abspath(path)
+        if abs_path.startswith(upload_dir + os.sep) and os.path.isfile(abs_path):
+            os.remove(abs_path)
+            logger.info("Deleted uploaded file after analysis: %s", abs_path)
+    except OSError as exc:
+        logger.warning("Could not delete uploaded file '%s': %s", path, exc)
 
 
 # ─── Tasks ────────────────────────────────────────────────────────────────────
