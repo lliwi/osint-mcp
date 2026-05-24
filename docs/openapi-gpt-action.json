@@ -84,7 +84,7 @@
       "post": {
         "operationId": "uploadFile",
         "summary": "Upload a file for analysis",
-        "description": "Upload binary file directly (curl/API clients). ChatGPT Actions cannot send binary files — use fetchFile instead. Validates MIME via magic bytes. Returns path for metadata_analysis or reverse_image_search.",
+        "description": "Upload a binary file. Validates MIME type via magic bytes. Returns path to use as target in metadata_analysis or reverse_image_search.",
         "requestBody": {
           "required": true,
           "content": {
@@ -123,7 +123,7 @@
       "post": {
         "operationId": "fetchFile",
         "summary": "Fetch a file from a public URL for analysis",
-        "description": "Use this for image/doc OSINT when you have a public URL. Downloads server-side, validates MIME, returns path. Native vision cannot extract EXIF/GPS — use this to get real metadata.",
+        "description": "Download a public URL server-side, validate MIME, and stage the file. Returns path to use as target in metadata_analysis or reverse_image_search.",
         "requestBody": {
           "required": true,
           "content": {
@@ -155,7 +155,7 @@
       "post": {
         "operationId": "runOsintWorkflow",
         "summary": "Launch an OSINT workflow",
-        "description": "Run OSINT workflow; poll /tasks/{task_id}. Map: email->email_reputation, domain->domain_recon, ip->ip_reputation, phone->phone_reputation, username->username_recon, person->person_recon, breach->breach_exposure_check, plate/VIN->vehicle_recon. For image/doc: fetchFile(URL) then metadata_analysis.",
+        "description": "Submit an OSINT workflow. Returns task_id; poll GET /tasks/{task_id} until status is completed, failed, or partial.",
         "requestBody": {
           "required": true,
           "content": {
@@ -190,7 +190,7 @@
       "get": {
         "operationId": "getTaskResult",
         "summary": "Get workflow result",
-        "description": "Returns status and result of a workflow. Poll every 3-5 seconds until status is completed, failed, or partial.",
+        "description": "Returns status and result of a workflow task.",
         "parameters": [
           {
             "name": "task_id",
@@ -223,7 +223,7 @@
       "post": {
         "operationId": "generateReport",
         "summary": "Generate a formatted OSINT report",
-        "description": "Generates a report for a completed task. Use format=markdown for readable output. Only call after status is completed.",
+        "description": "Generate a formatted report for a completed task. Supported formats: markdown, json, html.",
         "parameters": [
           {
             "name": "task_id",
@@ -320,11 +320,11 @@
               "breach_exposure_check",
               "vehicle_recon"
             ],
-            "description": "The OSINT workflow to execute. Use person_recon for full name searches (requires company or location in options for good results)."
+            "description": "The OSINT workflow to execute."
           },
           "target": {
             "type": "string",
-            "description": "Indicator to analyze: domain, IP, email, phone, username, URL, plate or VIN. For person_recon: ONLY full name. For reverse_image_search/metadata_analysis: path returned by POST /files/upload."
+            "description": "Indicator to analyze: domain, IP, email, phone, username, full name, plate, VIN, or file path returned by /files/upload or /files/fetch."
           },
           "mode": {
             "type": "string",
