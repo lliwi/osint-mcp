@@ -34,34 +34,23 @@ async def run(username: str, platform_scope: str = "all") -> OsintResult:
                 confidence=Confidence.medium,
                 notes=f"{len(profiles)} profiles found",
             ))
-            for p in profiles:
-                result.entities.append(Entity(
-                    type="social_profile",
-                    value=p["url"],
-                    attributes={"platform": p["platform"], "status": p["status"]},
-                ))
 
     # ── Maigret ───────────────────────────────────────────────────────────────
+    # Note: --json writes to a report file (fails in read-only container).
+    # Parse text output instead — same [+] Platform: URL format as Sherlock.
     maigret_run = await run_cli_tool(
-        "maigret", ["--no-color", "--top-sites", "100", "--timeout", "10", "--json", username]
+        "maigret", ["--no-color", "--top-sites", "500", "--timeout", "10", username]
     )
     if maigret_run.stdout and not maigret_run.timed_out:
-        import json
-        try:
-            maigret_data = json.loads(maigret_run.stdout)
-            result.sources.append(Source(name="maigret", success=True))
-            found = [
-                {"platform": k, "url": v.get("url", ""), "status": v.get("status", "")}
-                for k, v in maigret_data.items()
-                if isinstance(v, dict) and v.get("status") == "Claimed"
-            ]
-            if found:
-                result.findings.append(Finding(
-                    type="maigret_profiles", value=found, source="maigret",
-                    confidence=Confidence.medium,
-                ))
-        except (json.JSONDecodeError, AttributeError):
-            pass
+        parsed_m = sherlock_parser.parse(maigret_run.stdout)
+        result.sources.append(Source(name="maigret", success=maigret_run.returncode == 0))
+        maigret_profiles = parsed_m.get("profiles", [])
+        if maigret_profiles:
+            result.findings.append(Finding(
+                type="maigret_profiles", value=maigret_profiles, source="maigret",
+                confidence=Confidence.medium,
+                notes=f"{len(maigret_profiles)} profiles found",
+            ))
 
     # ── FullContact ───────────────────────────────────────────────────────────
     fc = await fullcontact.enrich_by_username(username, platform_scope if platform_scope != "all" else "")
@@ -212,22 +201,48 @@ async def run(username: str, platform_scope: str = "all") -> OsintResult:
                 f"Username found in {len(leak_hits)} leak/breach source(s) on IntelligenceX"
             )
 
+    # ── Consolidate active accounts (Sherlock + Maigret deduped) ─────────────
+    seen_urls: set[str] = set()
+    active_accounts: list[dict] = []
+    for f in result.findings:
+        if f.type in ("found_profiles", "maigret_profiles"):
+            for p in (f.value if isinstance(f.value, list) else []):
+                url = p.get("url", "").lower().rstrip("/")
+                if url and url not in seen_urls:
+                    seen_urls.add(url)
+                    active_accounts.append(p)
+                    result.entities.append(Entity(
+                        type="social_profile",
+                        value=p["url"],
+                        attributes={"platform": p.get("platform", ""), "status": p.get("status", "found")},
+                    ))
+
+    if active_accounts:
+        active_accounts.sort(key=lambda x: x.get("platform", "").lower())
+        result.findings.append(Finding(
+            type="active_accounts",
+            value=active_accounts,
+            source="sherlock+maigret",
+            confidence=Confidence.medium,
+            notes=f"{len(active_accounts)} unique active accounts across platforms",
+        ))
+
+    # Remove the raw per-tool findings now that we have the consolidated one
+    result.findings = [f for f in result.findings if f.type not in ("found_profiles", "maigret_profiles")]
+
     _finalize(result)
     return result
 
 
 
 def _finalize(result: OsintResult) -> None:
-    total_profiles = sum(
-        len(f.value) if isinstance(f.value, list) else 1
-        for f in result.findings
-        if f.type in ("found_profiles", "maigret_profiles", "fullcontact_profiles")
-    )
+    active = next((f for f in result.findings if f.type == "active_accounts"), None)
+    total_profiles = len(active.value) if active and isinstance(active.value, list) else 0
     if result.risk == Risk.unknown:
         result.risk = Risk.low
     result.confidence = Confidence.high if len(result.sources) >= 2 else Confidence.medium
     result.summary = (
-        f"Username recon for '{result.target}': {total_profiles} profiles found "
+        f"Username recon for '{result.target}': {total_profiles} unique active accounts found "
         f"across {len(result.sources)} sources."
     )
     result.status = TaskStatus.completed
