@@ -129,7 +129,11 @@ async def upload_file(file: UploadFile = File(...)):
         )
 
     # Validate MIME from magic bytes — never trust the client-supplied Content-Type
-    mime = magic.from_buffer(data, mime=True)
+    try:
+        mime = magic.from_buffer(data, mime=True)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"MIME detection failed: {exc}")
+
     if mime not in _ALLOWED_MIME_TYPES:
         raise HTTPException(
             status_code=415,
@@ -140,9 +144,12 @@ async def upload_file(file: UploadFile = File(...)):
     file_id = f"{uuid4()}{ext}"
     dest = os.path.join(_UPLOAD_DIR, file_id)
 
-    os.makedirs(_UPLOAD_DIR, exist_ok=True)
-    with open(dest, "wb") as fh:
-        fh.write(data)
+    try:
+        os.makedirs(_UPLOAD_DIR, exist_ok=True)
+        with open(dest, "wb") as fh:
+            fh.write(data)
+    except OSError as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to save file: {exc}")
 
     logger.info("File uploaded: %s (%s, %d bytes)", file_id, mime, len(data))
     return {
@@ -196,7 +203,11 @@ async def fetch_file(req: FetchRequest):
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"Failed to fetch URL: {exc}")
 
-    mime = magic.from_buffer(data, mime=True)
+    try:
+        mime = magic.from_buffer(data, mime=True)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"MIME detection failed: {exc}")
+
     if mime not in _ALLOWED_MIME_TYPES:
         raise HTTPException(
             status_code=415,
@@ -207,9 +218,12 @@ async def fetch_file(req: FetchRequest):
     file_id = f"{uuid4()}{ext}"
     dest = os.path.join(_UPLOAD_DIR, file_id)
 
-    os.makedirs(_UPLOAD_DIR, exist_ok=True)
-    with open(dest, "wb") as fh:
-        fh.write(data)
+    try:
+        os.makedirs(_UPLOAD_DIR, exist_ok=True)
+        with open(dest, "wb") as fh:
+            fh.write(data)
+    except OSError as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to save file: {exc}")
 
     logger.info("File fetched from URL: %s → %s (%s, %d bytes)", safe_url, file_id, mime, len(data))
     return {
