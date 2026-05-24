@@ -153,6 +153,73 @@ async def upload_file(file: UploadFile = File(...)):
     }
 
 
+class FetchRequest(BaseModel):
+    url: str
+
+
+@app.post("/files/fetch", dependencies=[Depends(require_api_key)])
+async def fetch_file(req: FetchRequest):
+    """
+    Download a file from a public URL and stage it for analysis.
+    Use this when the file is accessible via a URL (e.g. shared drive, CDN, paste site).
+    ChatGPT Actions must use this endpoint — direct binary upload is not supported by that platform.
+    """
+    import httpx
+    from osint_api.security.validator import validate_url, ValidationError as VErr
+
+    try:
+        safe_url = validate_url(req.url)
+    except VErr as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+
+    try:
+        async with httpx.AsyncClient(timeout=30, follow_redirects=True,
+                                      max_redirects=5) as client:
+            # Stream so we can enforce the size limit without loading it all into RAM first
+            async with client.stream("GET", safe_url) as resp:
+                if resp.status_code not in (200, 206):
+                    raise HTTPException(status_code=502,
+                                        detail=f"Remote server returned {resp.status_code}")
+                chunks: list[bytes] = []
+                total = 0
+                async for chunk in resp.aiter_bytes(chunk_size=64 * 1024):
+                    total += len(chunk)
+                    if total > _MAX_UPLOAD_BYTES:
+                        raise HTTPException(
+                            status_code=413,
+                            detail=f"Remote file exceeds {_MAX_UPLOAD_BYTES // (1024 * 1024)} MB limit.",
+                        )
+                    chunks.append(chunk)
+                data = b"".join(chunks)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Failed to fetch URL: {exc}")
+
+    mime = magic.from_buffer(data, mime=True)
+    if mime not in _ALLOWED_MIME_TYPES:
+        raise HTTPException(
+            status_code=415,
+            detail=f"File type '{mime}' is not allowed. Accepted: images, PDF, Office, ODF.",
+        )
+
+    ext = _ALLOWED_MIME_TYPES[mime]
+    file_id = f"{uuid4()}{ext}"
+    dest = os.path.join(_UPLOAD_DIR, file_id)
+
+    os.makedirs(_UPLOAD_DIR, exist_ok=True)
+    with open(dest, "wb") as fh:
+        fh.write(data)
+
+    logger.info("File fetched from URL: %s → %s (%s, %d bytes)", safe_url, file_id, mime, len(data))
+    return {
+        "file_id": file_id,
+        "path": dest,
+        "mime_type": mime,
+        "size_bytes": len(data),
+    }
+
+
 # ─── Workflows ────────────────────────────────────────────────────────────────
 
 @app.post("/workflow/run", dependencies=[Depends(require_api_key)])

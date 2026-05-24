@@ -84,7 +84,7 @@
       "post": {
         "operationId": "uploadFile",
         "summary": "Upload a file for analysis",
-        "description": "Upload image or document (PDF/Office/ODF). Returns path to pass as target in reverse_image_search or metadata_analysis. File is deleted automatically after analysis completes.",
+        "description": "Upload binary file directly (curl/API clients). ChatGPT Actions cannot send binary files — use fetchFile instead. Validates MIME via magic bytes. Returns path for metadata_analysis or reverse_image_search.",
         "requestBody": {
           "required": true,
           "content": {
@@ -119,11 +119,43 @@
         }
       }
     },
+    "/files/fetch": {
+      "post": {
+        "operationId": "fetchFile",
+        "summary": "Fetch a file from a public URL for analysis",
+        "description": "Use this for image/doc OSINT when you have a public URL. Downloads server-side, validates MIME, returns path. Native vision cannot extract EXIF/GPS — use this to get real metadata.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FetchRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "File fetched. Use path as target in the workflow.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadResponse"
+                }
+              }
+            }
+          },
+          "413": {"description": "Remote file exceeds 20 MB limit"},
+          "415": {"description": "File type not allowed"},
+          "502": {"description": "Failed to fetch remote URL"}
+        }
+      }
+    },
     "/workflow/run": {
       "post": {
         "operationId": "runOsintWorkflow",
         "summary": "Launch an OSINT workflow",
-        "description": "Run OSINT workflow; poll /tasks/{task_id}. Map: email->email_reputation, domain->domain_recon, ip->ip_reputation, phone->phone_reputation, username->username_recon, person->person_recon, breach->breach_exposure_check, plate/VIN->vehicle_recon. person_recon: ask company+location first.",
+        "description": "Run OSINT workflow; poll /tasks/{task_id}. Map: email->email_reputation, domain->domain_recon, ip->ip_reputation, phone->phone_reputation, username->username_recon, person->person_recon, breach->breach_exposure_check, plate/VIN->vehicle_recon. For image/doc: fetchFile(URL) then metadata_analysis.",
         "requestBody": {
           "required": true,
           "content": {
@@ -418,6 +450,16 @@
           "url": {"type": "string"},
           "queried_at": {"type": "string"},
           "success": {"type": "boolean"}
+        }
+      },
+      "FetchRequest": {
+        "type": "object",
+        "required": ["url"],
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "Public URL to the image or document to download and analyze. Must be https://."
+          }
         }
       },
       "UploadResponse": {
