@@ -200,6 +200,16 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "wait",
+            "in": "query",
+            "required": false,
+            "description": "Block up to this many seconds (max 25) until the task finishes. Use wait=20 to avoid repeated polling.",
+            "schema": {
+              "type": "integer",
+              "default": 0
+            }
           }
         ],
         "responses": {

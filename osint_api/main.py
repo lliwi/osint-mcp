@@ -281,10 +281,26 @@ def _delete_upload(path: str) -> None:
 # ─── Tasks ────────────────────────────────────────────────────────────────────
 
 @app.get("/tasks/{task_id}", dependencies=[Depends(require_api_key)])
-async def get_task(task_id: str):
+async def get_task(task_id: str, wait: int = 0):
+    """
+    Returns task status and result.
+    If wait>0, blocks up to that many seconds (max 25) until the task completes.
+    Use wait=20 to avoid repeated polling — ideal for GPT Actions.
+    """
+    import asyncio as _asyncio
+
     record = await task_store.get(task_id)
     if record is None:
         raise HTTPException(status_code=404, detail=f"Task '{task_id}' not found")
+
+    if wait > 0 and record.status == "running":
+        deadline = _asyncio.get_event_loop().time() + min(wait, 25)
+        while _asyncio.get_event_loop().time() < deadline:
+            await _asyncio.sleep(0.5)
+            record = await task_store.get(task_id)
+            if record is None or record.status != "running":
+                break
+
     return {
         "task_id": record.task_id,
         "workflow": record.workflow,
