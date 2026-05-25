@@ -30,23 +30,43 @@ Compatible con **Claude Code**, **Gemini CLI** y **ChatGPT** (mediante GPT Actio
 
 ---
 
-## Herramientas MCP disponibles (Fase 1 MVP)
+## Workflows OSINT disponibles
 
-| Herramienta | Descripción |
+| Workflow | Descripción |
 |---|---|
 | `domain_recon` | WHOIS, DNS, subdominios, tecnologías web |
 | `ip_reputation` | ASN, reputación, abuse reports, Shodan pasivo |
 | `email_reputation` | Servicios registrados, reputación, brechas (no passwords) |
 | `phone_reputation` | Carrier, país, tipo de línea, spam signals |
-| `username_recon` | Perfiles públicos (Sherlock + Maigret) |
-| `reverse_image_search` | Metadatos EXIF, hash, TinEye (sin reconocimiento facial) |
-| `metadata_analysis` | Metadatos de archivos, hash SHA256, riesgos privacidad |
-| `breach_exposure_check` | Brechas conocidas, VirusTotal (sin passwords) |
-| `list_osint_tools` | Lista el catálogo de herramientas |
-| `recommend_osint_workflow` | Auto-detecta tipo y recomienda workflows |
+| `username_recon` | Cuentas activas en 300+ plataformas (Sherlock + Maigret), enriquecimiento PDL/FullContact |
+| `person_recon` | Búsqueda por nombre completo: empleo, educación, perfiles sociales, ubicación (PDL, FullContact, IntelX) |
+| `reverse_image_search` | Búsqueda inversa por imagen, hash perceptual, TinEye |
+| `metadata_analysis` | Metadatos EXIF/GPS, autor, software, hash SHA256 de imágenes y documentos |
+| `breach_exposure_check` | Exposición en brechas conocidas, VirusTotal (sin passwords) |
+| `vehicle_recon` | Matrícula española o VIN → marca, modelo, motor, emisiones, historial ITV |
+
+## Herramientas de soporte MCP
+
+| Herramienta | Descripción |
+|---|---|
+| `list_osint_tools` | Lista el catálogo de herramientas disponibles |
+| `recommend_osint_workflow` | Auto-detecta tipo de indicador y recomienda workflows |
 | `run_osint_workflow` | Ejecuta cualquier workflow por nombre |
-| `get_task_result` | Consulta estado y resultado de una tarea |
+| `get_task_result` | Consulta estado y resultado de una tarea (soporta long-polling con `?wait=N`) |
 | `export_report` | Exporta informe en Markdown / JSON / HTML |
+
+## API de archivos
+
+Permite analizar imágenes y documentos para extraer metadatos EXIF/GPS y datos del autor.
+
+| Endpoint | Descripción |
+|---|---|
+| `POST /files/upload` | Sube un archivo binario directamente (curl, API clients). Valida MIME por magic bytes. |
+| `POST /files/fetch` | Descarga un archivo desde URL pública y lo prepara para análisis. Uso obligatorio desde GPT Actions (no puede enviar binarios). |
+
+Formatos soportados: JPEG, PNG, WebP, GIF, TIFF, BMP, HEIC, PDF, DOC/DOCX, XLS/XLSX, PPT/PPTX, ODT/ODS/ODP. Límite: 20 MB.
+
+> **Nota para ChatGPT:** usar siempre `fetchFile` con la URL del archivo. Servicios que preservan metadatos EXIF: `0x0.st`, `catbox.moe`, `transfer.sh`. Evitar Imgur, WhatsApp y CDNs de redes sociales (eliminan metadatos).
 
 ---
 
@@ -196,7 +216,7 @@ mcp-osint-server/
 │   ├── runners/        # Ejecución segura de CLIs
 │   ├── parsers/        # Parsers de output por herramienta
 │   ├── connectors/     # APIs externas (AbuseIPDB, HIBP, etc.)
-│   ├── workflows/      # 8 workflows OSINT
+│   ├── workflows/      # 10 workflows OSINT
 │   ├── catalog/        # Catálogo de herramientas
 │   ├── security/       # Allowlist, validator, sanitizer, rate limiter
 │   └── reports/        # Generadores Markdown/JSON/HTML
@@ -210,7 +230,7 @@ mcp-osint-server/
 
 ## Roadmap
 
-- **Fase 1 (actual):** MVP — 8 workflows, Docker Kali, catálogo, informes
+- **Fase 1 (actual):** MVP — 10 workflows, Docker Kali, catálogo, informes, API archivos, long-polling
 - **Fase 2:** Autenticación, políticas por rol, cola de tareas, auditoría avanzada
 - **Fase 3:** Correlación de entidades, grafo OSINT, scoring avanzado, STIX/TAXII
 
