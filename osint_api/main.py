@@ -176,8 +176,13 @@ async def upload_base64(req: UploadBase64Request):
     try:
         # Strip data-URI prefix if present (e.g. "data:image/png;base64,...")
         raw_b64 = req.data.split(",", 1)[-1] if "," in req.data else req.data
-        # Normalize: strip whitespace/newlines, then re-pad to a multiple of 4
+        # Normalize: strip whitespace, newlines, spaces
         raw_b64 = raw_b64.strip().replace("\n", "").replace("\r", "").replace(" ", "")
+        # Remove any existing padding before re-padding
+        raw_b64 = raw_b64.rstrip("=")
+        # len % 4 == 1 is impossible in valid base64 (truncated data); drop the extra char
+        if len(raw_b64) % 4 == 1:
+            raw_b64 = raw_b64[:-1]
         raw_b64 += "=" * (-len(raw_b64) % 4)
         data = _b64.b64decode(raw_b64)
     except Exception as exc:
@@ -336,6 +341,26 @@ def _delete_upload(path: str) -> None:
             logger.info("Deleted uploaded file after analysis: %s", abs_path)
     except OSError as exc:
         logger.warning("Could not delete uploaded file '%s': %s", path, exc)
+
+
+# ─── Temporary file serving (for SerpAPI reverse image search) ───────────────
+
+@app.get("/files/{file_id}")
+async def serve_uploaded_file(file_id: str):
+    """
+    Serve a staged upload by its UUID filename.
+    No auth required — file_id is a UUID (unguessable) and files are short-lived.
+    Used internally so SerpAPI can fetch the image via a public URL.
+    """
+    from fastapi.responses import FileResponse
+    from osint_api.security.validator import validate_file_path, ValidationError as VErr
+    try:
+        safe_path = validate_file_path(file_id, _UPLOAD_DIR)
+    except VErr:
+        raise HTTPException(status_code=404, detail="File not found")
+    if not os.path.isfile(safe_path):
+        raise HTTPException(status_code=404, detail="File not found")
+    return FileResponse(safe_path)
 
 
 # ─── Tasks ────────────────────────────────────────────────────────────────────
