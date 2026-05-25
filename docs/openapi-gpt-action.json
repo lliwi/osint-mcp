@@ -119,6 +119,38 @@
         }
       }
     },
+    "/files/upload-base64": {
+      "post": {
+        "operationId": "uploadFileBase64",
+        "summary": "Upload a file as base64",
+        "description": "Decode and stage a base64-encoded file. Use when the user attaches an image or document directly to the chat. Accepts raw base64 or data-URI format.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UploadBase64Request"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "File decoded and staged. Use path as target in the workflow.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadResponse"
+                }
+              }
+            }
+          },
+          "413": {"description": "File exceeds 20 MB limit"},
+          "415": {"description": "File type not allowed"},
+          "422": {"description": "Invalid base64 data"}
+        }
+      }
+    },
     "/files/fetch": {
       "post": {
         "operationId": "fetchFile",
@@ -460,6 +492,21 @@
           "url": {"type": "string"},
           "queried_at": {"type": "string"},
           "success": {"type": "boolean"}
+        }
+      },
+      "UploadBase64Request": {
+        "type": "object",
+        "required": ["data"],
+        "properties": {
+          "data": {
+            "type": "string",
+            "description": "Base64-encoded file content. Accepts raw base64 or data-URI (data:image/png;base64,...)."
+          },
+          "filename": {
+            "type": "string",
+            "description": "Optional original filename hint.",
+            "default": "file"
+          }
         }
       },
       "FetchRequest": {

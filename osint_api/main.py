@@ -160,6 +160,63 @@ async def upload_file(file: UploadFile = File(...)):
     }
 
 
+class UploadBase64Request(BaseModel):
+    data: str
+    filename: str = "file"
+
+
+@app.post("/files/upload-base64", dependencies=[Depends(require_api_key)])
+async def upload_base64(req: UploadBase64Request):
+    """
+    Decode a base64-encoded file and stage it for analysis.
+    Use when you have the file as base64 (e.g., from a user attachment).
+    """
+    import base64 as _b64
+
+    try:
+        # Strip data-URI prefix if present (e.g. "data:image/png;base64,...")
+        raw_b64 = req.data.split(",", 1)[-1] if "," in req.data else req.data
+        data = _b64.b64decode(raw_b64)
+    except Exception as exc:
+        raise HTTPException(status_code=422, detail=f"Invalid base64 data: {exc}")
+
+    if len(data) > _MAX_UPLOAD_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail=f"File too large. Maximum allowed: {_MAX_UPLOAD_BYTES // (1024 * 1024)} MB.",
+        )
+
+    try:
+        mime = magic.from_buffer(data, mime=True)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"MIME detection failed: {exc}")
+
+    if mime not in _ALLOWED_MIME_TYPES:
+        raise HTTPException(
+            status_code=415,
+            detail=f"File type '{mime}' is not allowed. Accepted: images, PDF, Office, ODF.",
+        )
+
+    ext = _ALLOWED_MIME_TYPES[mime]
+    file_id = f"{uuid4()}{ext}"
+    dest = os.path.join(_UPLOAD_DIR, file_id)
+
+    try:
+        os.makedirs(_UPLOAD_DIR, exist_ok=True)
+        with open(dest, "wb") as fh:
+            fh.write(data)
+    except OSError as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to save file: {exc}")
+
+    logger.info("File uploaded (base64): %s (%s, %d bytes)", file_id, mime, len(data))
+    return {
+        "file_id": file_id,
+        "path": dest,
+        "mime_type": mime,
+        "size_bytes": len(data),
+    }
+
+
 class FetchRequest(BaseModel):
     url: str
 
