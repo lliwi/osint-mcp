@@ -176,6 +176,9 @@ async def upload_base64(req: UploadBase64Request):
     try:
         # Strip data-URI prefix if present (e.g. "data:image/png;base64,...")
         raw_b64 = req.data.split(",", 1)[-1] if "," in req.data else req.data
+        # Normalize: strip whitespace/newlines, then re-pad to a multiple of 4
+        raw_b64 = raw_b64.strip().replace("\n", "").replace("\r", "").replace(" ", "")
+        raw_b64 += "=" * (-len(raw_b64) % 4)
         data = _b64.b64decode(raw_b64)
     except Exception as exc:
         raise HTTPException(status_code=422, detail=f"Invalid base64 data: {exc}")

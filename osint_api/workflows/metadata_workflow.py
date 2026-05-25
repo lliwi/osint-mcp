@@ -20,6 +20,12 @@ _UPLOAD_DIR = os.getenv("UPLOAD_DIR", "/tmp/osint-uploads")
 
 async def run(file_path: str) -> OsintResult:
     safe_path = validate_file_path(file_path, _UPLOAD_DIR)
+    if not os.path.isfile(safe_path):
+        raise ValueError(
+            f"File '{os.path.basename(safe_path)}' not found on the server. "
+            "Upload it first with uploadFileBase64 (or fetchFile for a URL) "
+            "and use the returned 'path' as the target."
+        )
     basename = os.path.basename(safe_path)
 
     result = OsintResult(
