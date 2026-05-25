@@ -437,6 +437,13 @@ def main() -> None:
             ]
         )
 
+        # Suppress /health spam from SSE keep-alive polling in access logs
+        import logging as _logging
+        class _HealthFilter(_logging.Filter):
+            def filter(self, record: _logging.LogRecord) -> bool:
+                return "GET /health" not in record.getMessage()
+        _logging.getLogger("uvicorn.access").addFilter(_HealthFilter())
+
         logger.info("MCP OSINT Server (SSE) starting on %s:%s", args.host, args.port)
         uvicorn.run(starlette_app, host=args.host, port=args.port)
 

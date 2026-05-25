@@ -28,12 +28,12 @@ async def run(username: str, platform_scope: str = "all") -> OsintResult:
     sherlock_folder = f"/tmp/sherlock-{uuid.uuid4().hex[:8]}"
     maigret_folder  = f"/tmp/maigret-{uuid.uuid4().hex[:8]}"
 
-    sherlock_args = ["--print-found", "--no-color", "--timeout", "5",
+    sherlock_args = ["--print-found", "--no-color", "--timeout", "3",
                      "--folderoutput", sherlock_folder, username]
     if platform_scope and platform_scope != "all":
         sherlock_args = ["--site", platform_scope, *sherlock_args]
 
-    maigret_args = ["--no-color", "--top-sites", "300", "--timeout", "5",
+    maigret_args = ["--no-color", "--top-sites", "100", "--timeout", "3",
                     "--folderoutput", maigret_folder, username]
 
     sherlock_run, maigret_run = await asyncio.gather(
