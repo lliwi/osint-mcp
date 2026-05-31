@@ -101,7 +101,7 @@ tools:
   - name: shodan
     category: ip
     type: api
-    enabled: false
+    enabled: true
     requires_api_key: true
     risk_level: medium
     description: Shodan passive service discovery
