@@ -14,6 +14,7 @@ from osint_api.workflows import (
     metadata_workflow,
     person_workflow,
     phone_workflow,
+    secret_scan_workflow,
     username_workflow,
     vehicle_workflow,
 )
@@ -26,7 +27,8 @@ _TYPE_WORKFLOW_MAP: dict[str, list[str]] = {
     "phone": ["phone_reputation"],
     "username": ["username_recon"],
     "image": ["reverse_image_search", "metadata_analysis"],
-    "file": ["metadata_analysis"],
+    "file": ["metadata_analysis", "secret_scan"],
+    "repo": ["secret_scan"],
     "url": ["breach_exposure_check"],
     "plate": ["vehicle_recon"],
 }
@@ -59,6 +61,7 @@ _WORKFLOWS: dict[str, callable] = {
     "metadata_analysis": _wrap(metadata_workflow.run, "file_path"),
     "breach_exposure_check": _wrap(breach_workflow.run, "indicator", "indicator_type"),
     "vehicle_recon": _wrap(vehicle_workflow.run, "plate", "country"),
+    "secret_scan": _wrap(secret_scan_workflow.run, "target", "scan_type"),
 }
 
 
@@ -78,10 +81,16 @@ def recommend(indicator: str) -> dict:
     import re
     indicator = indicator.strip()
 
+    _GIT_HOSTS = ("github.com", "gitlab.com", "bitbucket.org", "codeberg.org")
     if "@" in indicator:
         detected = "email"
     elif indicator.startswith("http://") or indicator.startswith("https://"):
-        detected = "url"
+        host = re.match(r"^https?://([^/:?#]+)", indicator, re.IGNORECASE)
+        host = host.group(1).lower() if host else ""
+        if indicator.endswith(".git") or any(host == h or host.endswith("." + h) for h in _GIT_HOSTS):
+            detected = "repo"
+        else:
+            detected = "url"
     elif re.match(r"^\d{1,3}(\.\d{1,3}){3}$", indicator):
         detected = "ip"
     elif re.match(r"^\+?[0-9\s\-().]{7,15}$", indicator):

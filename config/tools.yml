@@ -68,7 +68,7 @@ tools:
     outputs: [status_code, title, server, technologies]
     parser: httpx_parser
     timeout: 60
-    allowed_args: ["-u", "-silent", "-title", "-status-code", "-tech-detect", "-web-server", "-follow-redirects", "-timeout"]
+    allowed_args: ["-u", "-silent", "-json", "-title", "-status-code", "-tech-detect", "-web-server", "-follow-redirects", "-timeout"]
 
   - name: whatweb
     category: domain

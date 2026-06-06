@@ -70,13 +70,22 @@ _API_KEY_MAP: dict[str, str] = {
     "numverify":                   "NUMVERIFY_API_KEY",
 }
 
+# ── Runtime binaries required by workflows but NOT listed in tools.yml ─────────
+_RUNTIME_BINARIES: dict[str, str] = {
+    "git": "secret_scan — clones public git repositories before scanning",
+}
+
 # ── Live test fixtures — datos reales inofensivos ─────────────────────────────
+# Workflow names must match osint_api.workflows.orchestrator._WORKFLOWS.
 _LIVE_FIXTURES: dict[str, dict] = {
     "domain_recon":     {"workflow": "domain_recon",     "target": "example.com"},
-    "email_osint":      {"workflow": "email_osint",      "target": "test@example.com"},
+    "email_reputation": {"workflow": "email_reputation", "target": "test@example.com"},
     "ip_reputation":    {"workflow": "ip_reputation",    "target": "8.8.8.8"},
-    "username_lookup":  {"workflow": "username_lookup",  "target": "johndoe"},
-    "phone_lookup":     {"workflow": "phone_lookup",     "target": "+15555550100"},
+    "username_recon":   {"workflow": "username_recon",   "target": "johndoe"},
+    "phone_reputation": {"workflow": "phone_reputation", "target": "+15555550100"},
+    # secret_scan auto-detects the git URL and clones + scans with gitleaks + trufflehog.
+    # Hello-World is tiny and clean: validates the clone+scan pipeline runs (0 findings expected).
+    "secret_scan":      {"workflow": "secret_scan",      "target": "https://github.com/octocat/Hello-World"},
 }
 
 COLORS = {
@@ -148,6 +157,23 @@ def static_checks(tools: list[dict], env: dict[str, str]) -> dict[str, int]:
             for line in lines:
                 print(line)
 
+    return counts
+
+
+def runtime_binary_checks() -> dict[str, int]:
+    """Check binaries that workflows shell out to but that are not in tools.yml."""
+    counts = {"ok": 0, "missing": 0}
+    print(f"\n{c('bold', 'RUNTIME BINARIES')}")
+    for binary, why in _RUNTIME_BINARIES.items():
+        path = shutil.which(binary)
+        if path:
+            counts["ok"] += 1
+            print(ok(f"{binary} — found at {path}"))
+            print(info(why))
+        else:
+            counts["missing"] += 1
+            print(err(f"{binary} — not found in PATH"))
+            print(info(why))
     return counts
 
 
@@ -232,11 +258,15 @@ def main() -> None:
     print(c("bold", f"{'─'*60}"))
 
     counts = static_checks(tools, env)
+    rt = runtime_binary_checks()
+
+    ready = counts['ok'] + rt['ok']
+    unavailable = counts['missing'] + counts['missing_key'] + rt['missing']
 
     print(f"\n{c('bold', '─'*60)}")
-    print(f" {ok(str(counts['ok']))} ready   "
+    print(f" {ok(str(ready))} ready   "
           f" {warn(str(counts['disabled']))} disabled   "
-          f" {err(str(counts['missing'] + counts['missing_key']))} unavailable")
+          f" {err(str(unavailable))} unavailable")
     if counts.get("unknown"):
         print(f" {c('yellow', str(counts['unknown']))} unknown mapping")
     print(c("bold", "─"*60))

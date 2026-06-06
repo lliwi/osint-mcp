@@ -114,6 +114,22 @@ def validate_url(value: str) -> str:
     return value
 
 
+_ALLOWED_GIT_HOSTS = {"github.com", "www.github.com", "gitlab.com", "www.gitlab.com",
+                      "bitbucket.org", "codeberg.org"}
+
+
+def validate_git_url(value: str) -> str:
+    """Validate a public https git URL on a trusted host (for secret scanning)."""
+    value = validate_url(value)  # https only, blocks internal hosts
+    host_match = re.match(r"^https?://([^/:?#]+)", value, re.IGNORECASE)
+    host = host_match.group(1).lower() if host_match else ""
+    if host not in _ALLOWED_GIT_HOSTS:
+        raise ValidationError(
+            f"Git host '{host}' not allowed. Use one of: {sorted(_ALLOWED_GIT_HOSTS)}"
+        )
+    return value
+
+
 def validate_file_path(value: str, base_dir: str) -> str:
     """Validates that value is a safe filename inside base_dir."""
     basename = os.path.basename(value)

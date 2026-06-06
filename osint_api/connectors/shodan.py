@@ -46,3 +46,34 @@ async def check_ip(ip: str) -> dict:
         "vulns": list(data.get("vulns", {}).keys())[:10],
         "last_update": data.get("last_update", ""),
     }
+
+
+async def check_domain(domain: str) -> dict:
+    """Passive Shodan lookup for a domain: resolve to IP, then host info."""
+    api_key = os.getenv("SHODAN_API_KEY", "")
+    if not api_key:
+        return {"available": False, "reason": "SHODAN_API_KEY not configured"}
+
+    async with httpx.AsyncClient(timeout=30) as client:
+        try:
+            resolve = await client.get(
+                "https://api.shodan.io/dns/resolve",
+                params={"hostnames": domain, "key": api_key},
+            )
+            resolve.raise_for_status()
+            ip = resolve.json().get(domain)
+        except Exception as exc:
+            return {"available": False, "error": str(exc)}
+
+    if not ip:
+        return {"available": True, "found": False, "domain": domain}
+
+    host = await check_ip(ip)
+    if not host.get("available"):
+        return host
+    if not host.get("found"):
+        return {"available": True, "found": False, "domain": domain, "resolved_ip": ip}
+
+    host["domain"] = domain
+    host["resolved_ip"] = ip
+    return host

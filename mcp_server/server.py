@@ -172,6 +172,29 @@ _TOOLS = [
         },
     ),
     Tool(
+        name="secret_scan",
+        description="Scan an uploaded file/directory or a public git repository "
+                    "(github.com, gitlab.com, bitbucket.org, codeberg.org) for leaked "
+                    "credentials and secrets using gitleaks and trufflehog. "
+                    "Defensive use only — detected secrets are redacted, never shown in full.",
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "target": {
+                    "type": "string",
+                    "description": "Filename already uploaded to the server, or an https git URL",
+                },
+                "scan_type": {
+                    "type": "string",
+                    "enum": ["auto", "file", "git"],
+                    "default": "auto",
+                    "description": "Force a scan mode, or 'auto' to detect from the target",
+                },
+            },
+            "required": ["target"],
+        },
+    ),
+    Tool(
         name="list_osint_tools",
         description="List available OSINT tools in the catalog, optionally filtered by category.",
         inputSchema={
@@ -314,6 +337,7 @@ async def _dispatch(name: str, args: dict) -> str:
             "metadata_analysis": "metadata_analysis",
             "breach_exposure_check": "breach_exposure_check",
             "vehicle_recon": "vehicle_recon",
+            "secret_scan": "secret_scan",
             "run_osint_workflow": args.get("workflow", ""),
         }
 

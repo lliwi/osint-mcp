@@ -38,7 +38,7 @@ TOOL_ALLOWLIST: dict[str, dict] = {
     },
     "httpx": {
         "binary": "httpx",
-        "allowed_flags": ["-u", "-silent", "-title", "-status-code", "-tech-detect",
+        "allowed_flags": ["-u", "-silent", "-json", "-title", "-status-code", "-tech-detect",
                           "-web-server", "-follow-redirects", "-timeout"],
         "positional_validators": [],
         "timeout": 60,
@@ -120,6 +120,12 @@ TOOL_ALLOWLIST: dict[str, dict] = {
                           "--concurrency", "--only-verified"],
         "positional_validators": [],
         "timeout": 120,
+    },
+    "git": {
+        "binary": "git",
+        "allowed_flags": ["clone", "--quiet", "--single-branch", "--no-tags", "--depth"],
+        "positional_validators": [],
+        "timeout": 180,
     },
 }
 

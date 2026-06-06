@@ -24,7 +24,7 @@ Compatible con **Claude Code**, **Gemini CLI** y **ChatGPT** (mediante GPT Actio
     ├── whois, dig, subfinder, theHarvester, httpx, whatweb
     ├── sherlock, maigret, holehe, phoneinfoga
     ├── exiftool, mat2, pdfinfo, file, strings
-    ├── gitleaks, trufflehog
+    ├── gitleaks, trufflehog, git (clonado de repos)
     └── Conectores: AbuseIPDB, HIBP, EmailRep, VirusTotal, Shodan
 ```
 
@@ -34,7 +34,7 @@ Compatible con **Claude Code**, **Gemini CLI** y **ChatGPT** (mediante GPT Actio
 
 | Workflow | Descripción |
 |---|---|
-| `domain_recon` | WHOIS, DNS, subdominios, tecnologías web |
+| `domain_recon` | WHOIS, DNS, subdominios (subfinder), theHarvester, Shodan pasivo. Con `passive_only=false`: sondeo HTTP (httpx) y fingerprinting web (whatweb) |
 | `ip_reputation` | ASN, reputación, abuse reports, Shodan pasivo |
 | `email_reputation` | Servicios registrados, reputación, brechas (no passwords) |
 | `phone_reputation` | Carrier, país, tipo de línea, spam signals |
@@ -44,6 +44,7 @@ Compatible con **Claude Code**, **Gemini CLI** y **ChatGPT** (mediante GPT Actio
 | `metadata_analysis` | Metadatos EXIF/GPS, autor, software, hash SHA256 de imágenes y documentos |
 | `breach_exposure_check` | Exposición en brechas conocidas, VirusTotal (sin passwords) |
 | `vehicle_recon` | Matrícula española o VIN → marca, modelo, motor, emisiones, historial ITV |
+| `secret_scan` | Escaneo de secretos/credenciales filtrados en un repositorio git público (github, gitlab, bitbucket, codeberg) o fichero subido, con gitleaks + trufflehog. Secretos siempre redactados |
 
 ## Herramientas de soporte MCP
 
@@ -154,10 +155,33 @@ pytest tests/ -v
 | Variable | Descripción | Por defecto |
 |---|---|---|
 | `OSINT_MODE` | Modo de operación: `safe`, `analyst`, `lab` | `safe` |
-| `OSINT_INTERNAL_API_KEY` | Clave compartida MCP server ↔ OSINT API (genera un UUID) | `changeme` |
+| `OSINT_INTERNAL_API_KEY` | Clave compartida MCP server ↔ OSINT API ([cómo generarla](#generar-osint_internal_api_key)) | `changeme` |
 | `LOG_LEVEL` | Nivel de log: DEBUG, INFO, WARNING, ERROR | `INFO` |
 | `MAX_TASK_TIME_SECONDS` | Timeout máximo por tarea | `300` |
 | `MAX_CONCURRENT_TASKS` | Tareas concurrentes máximas | `3` |
+
+#### Generar `OSINT_INTERNAL_API_KEY`
+
+No se obtiene de ningún proveedor externo: es un **secreto compartido** que tú generas y que autentica al servidor MCP frente a la OSINT API (cabecera `X-OSINT-API-Key`). Debe ser idéntico en ambos lados (el `.env` de la API y la config del cliente MCP). Genera un valor aleatorio con cualquiera de estos comandos:
+
+```bash
+# Opción A — UUID
+uuidgen
+
+# Opción B — 32 bytes aleatorios en hex (Python, siempre disponible)
+python3 -c "import secrets; print(secrets.token_hex(32))"
+
+# Opción C — OpenSSL
+openssl rand -hex 32
+```
+
+Copia el valor en `config/.env`:
+
+```bash
+OSINT_INTERNAL_API_KEY=el-valor-generado
+```
+
+Y usa **el mismo valor** en la config del cliente MCP (campo `OSINT_INTERNAL_API_KEY` del ejemplo de Claude Code más abajo) y al ejecutar el check en modo `--live`. No lo dejes en `changeme` fuera de desarrollo.
 
 ### Modelos LLM (para el cliente)
 
@@ -209,14 +233,14 @@ Todas son opcionales. El sistema funciona con las que estén configuradas y degr
 ```
 mcp-osint-server/
 ├── mcp_server/         # Servidor MCP (stdio + SSE)
-│   ├── server.py       # Entry point, 13 herramientas MCP
+│   ├── server.py       # Entry point, 15 herramientas MCP
 │   └── schemas/        # Pydantic models compartidos
 ├── osint_api/          # FastAPI backend
 │   ├── main.py
 │   ├── runners/        # Ejecución segura de CLIs
 │   ├── parsers/        # Parsers de output por herramienta
 │   ├── connectors/     # APIs externas (AbuseIPDB, HIBP, etc.)
-│   ├── workflows/      # 10 workflows OSINT
+│   ├── workflows/      # 11 workflows OSINT
 │   ├── catalog/        # Catálogo de herramientas
 │   ├── security/       # Allowlist, validator, sanitizer, rate limiter
 │   └── reports/        # Generadores Markdown/JSON/HTML
@@ -230,7 +254,7 @@ mcp-osint-server/
 
 ## Roadmap
 
-- **Fase 1 (actual):** MVP — 10 workflows, Docker Kali, catálogo, informes, API archivos, long-polling
+- **Fase 1 (actual):** MVP — 11 workflows, Docker Kali, catálogo, informes, API archivos, long-polling
 - **Fase 2:** Autenticación, políticas por rol, cola de tareas, auditoría avanzada
 - **Fase 3:** Correlación de entidades, grafo OSINT, scoring avanzado, STIX/TAXII
 

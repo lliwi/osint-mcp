@@ -3,8 +3,8 @@ from __future__ import annotations
 from mcp_server.schemas.common import (
     Confidence, Finding, OsintResult, Risk, Source, TargetType, TaskStatus,
 )
-from osint_api.connectors import virustotal
-from osint_api.parsers import theharvester_parser, whois_parser
+from osint_api.connectors import shodan, virustotal
+from osint_api.parsers import httpx_parser, theharvester_parser, whatweb_parser, whois_parser
 from osint_api.runners.cli_runner import run_cli_tool
 from osint_api.security.validator import validate_domain
 
@@ -53,6 +53,37 @@ async def run(domain: str, depth: str = "standard", passive_only: bool = True) -
                 confidence=Confidence.medium,
             ))
 
+    # ── HTTP probing & fingerprinting (active) ────────────────────────────────
+    if not passive_only:
+        url = f"https://{domain}"
+
+        httpx_run = await run_cli_tool(
+            "httpx",
+            ["-u", domain, "-silent", "-json", "-title", "-status-code",
+             "-web-server", "-tech-detect", "-follow-redirects"],
+        )
+        if httpx_run.stdout:
+            parsed_x = httpx_parser.parse(httpx_run.stdout)
+            if parsed_x.get("probes"):
+                result.sources.append(Source(name="httpx", success=httpx_run.returncode == 0))
+                result.findings.append(Finding(
+                    type="http_probe", value=parsed_x["probes"], source="httpx",
+                    confidence=Confidence.high,
+                ))
+
+        whatweb_run = await run_cli_tool(
+            "whatweb", ["--no-errors", url]
+        )
+        if whatweb_run.stdout:
+            parsed_w = whatweb_parser.parse(whatweb_run.stdout)
+            if parsed_w.get("technologies") or parsed_w.get("server"):
+                result.sources.append(Source(name="whatweb", success=whatweb_run.returncode == 0))
+                result.findings.append(Finding(
+                    type="web_fingerprint",
+                    value={k: v for k, v in parsed_w.items() if v},
+                    source="whatweb", confidence=Confidence.high,
+                ))
+
     # ── theHarvester ─────────────────────────────────────────────────────────
     harvester_run = await run_cli_tool(
         "theHarvester", ["-d", domain, "-b", "bing,duckduckgo,certspotter,crtsh,dnsdumpster", "-l", "100"]
@@ -66,6 +97,29 @@ async def run(domain: str, depth: str = "standard", passive_only: bool = True) -
                     type=key, value=parsed_h[key], source="theHarvester",
                     confidence=Confidence.medium,
                 ))
+
+    # ── Shodan (passive service discovery) ───────────────────────────────────
+    shodan_data = await shodan.check_domain(domain)
+    if shodan_data.get("available") and shodan_data.get("found"):
+        result.sources.append(Source(name="Shodan", url="https://www.shodan.io"))
+        if shodan_data.get("resolved_ip"):
+            result.findings.append(Finding(
+                type="shodan_resolved_ip", value=shodan_data["resolved_ip"],
+                source="Shodan", confidence=Confidence.high,
+            ))
+        for field in ("org", "asn", "ports", "services"):
+            if shodan_data.get(field):
+                result.findings.append(Finding(
+                    type=field, value=shodan_data[field],
+                    source="Shodan", confidence=Confidence.high,
+                ))
+        if shodan_data.get("vulns"):
+            result.risk = Risk.high
+            result.findings.append(Finding(
+                type="known_vulnerabilities", value=shodan_data["vulns"],
+                source="Shodan", confidence=Confidence.medium,
+            ))
+            result.warnings.append(f"Shodan reports {len(shodan_data['vulns'])} known vulnerabilities")
 
     # ── VirusTotal (API) ──────────────────────────────────────────────────────
     vt = await virustotal.check_domain(domain)
