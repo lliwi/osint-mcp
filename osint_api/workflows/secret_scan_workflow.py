@@ -78,15 +78,15 @@ async def _scan_file(result: OsintResult, file_path: str) -> None:
     th_run = await run_cli_tool(
         "trufflehog", ["filesystem", safe_path, "--json", "--no-update"]
     )
-    if th_run.stdout:
-        parsed = trufflehog_parser.parse(th_run.stdout)
-        result.sources.append(Source(name="trufflehog", success=th_run.returncode == 0))
-        _record_secrets(result, parsed, source="trufflehog")
+    _record_trufflehog(result, th_run)
 
 
 async def _scan_git(result: OsintResult, git_url: str) -> None:
     safe_url = validate_git_url(git_url)
-    result.warnings.append("Scanning a remote repository clones it on the server.")
+    result.warnings.append(
+        "Clones the repository on the server and scans the FULL git history of the "
+        "default branch (all commits) with gitleaks and trufflehog — not just the current tree."
+    )
 
     clone_dir = tempfile.mkdtemp(prefix="secret-scan-")
     report_path = os.path.join(clone_dir, f".gitleaks-{uuid.uuid4().hex[:8]}.json")
@@ -122,12 +122,24 @@ async def _scan_git(result: OsintResult, git_url: str) -> None:
         th_run = await run_cli_tool(
             "trufflehog", ["git", f"file://{clone_dir}", "--json", "--no-update"]
         )
-        if th_run.stdout:
-            parsed = trufflehog_parser.parse(th_run.stdout)
-            result.sources.append(Source(name="trufflehog", success=th_run.returncode == 0))
-            _record_secrets(result, parsed, source="trufflehog")
+        _record_trufflehog(result, th_run)
     finally:
         shutil.rmtree(clone_dir, ignore_errors=True)
+
+
+def _record_trufflehog(result: OsintResult, th_run) -> None:
+    """Record trufflehog as a source whenever it actually ran.
+
+    trufflehog emits findings on stdout and logs on stderr, so a clean target
+    produces empty stdout — that means 'ran, found nothing', not 'did not run'.
+    """
+    if th_run.timed_out:
+        result.sources.append(Source(name="trufflehog", success=False))
+        result.warnings.append("trufflehog timed out before finishing the scan")
+        return
+    parsed = trufflehog_parser.parse(th_run.stdout)
+    result.sources.append(Source(name="trufflehog", success=th_run.returncode == 0))
+    _record_secrets(result, parsed, source="trufflehog")
 
 
 def _record_secrets(result: OsintResult, parsed: dict, source: str) -> None:
