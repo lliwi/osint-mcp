@@ -402,7 +402,7 @@
           },
           "options": {
             "type": "object",
-            "description": "Extra params: depth (domain_recon), country_hint (phone_reputation), indicator_type (breach), platform_scope (username_recon), country (vehicle_recon), scan_type (secret_scan: auto|file|git), entity_type (company_recon: auto|company|person|product|law|place|research).",
+            "description": "Extra params: depth (domain_recon), country_hint (phone_reputation), indicator_type (breach), platform_scope (username_recon), country (vehicle_recon), scan_type (secret_scan: auto|file|git), entity_type (company_recon: auto|company|person|product|law|place|research), query (company_recon: a Cala QL dot-notation expression like 'Italdesign Barcelona.employees' or a natural-language question to get a precise structured answer — use whenever the user asks for a specific attribute).",
             "additionalProperties": true
           }
         }

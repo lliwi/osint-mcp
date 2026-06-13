@@ -27,8 +27,9 @@ _RISK_KEYWORDS = (
 _MAX_PROPERTY_FINDINGS = 25
 
 
-async def run(name: str, entity_type: str = "auto") -> OsintResult:
+async def run(name: str, entity_type: str = "auto", query: str = "") -> OsintResult:
     name = name.strip()
+    query = (query or "").strip()
     result = OsintResult(
         workflow="company_recon",
         target=name,
@@ -43,62 +44,86 @@ async def run(name: str, entity_type: str = "auto") -> OsintResult:
         result.confidence = Confidence.low
         return result
 
-    types = [_TYPE_HINT[entity_type]] if entity_type in _TYPE_HINT else None
+    cala_responded = False  # did any Cala endpoint answer (key valid / reachable)?
 
-    # ── 1. Resolve the name to a verified entity ──────────────────────────────
+    # ── 1. Concrete structured answer (knowledge/query) ───────────────────────
+    # Only runs when the caller passes a specific attribute/question. This is the
+    # path that answers "how many employees…" with typed, current rows — distinct
+    # from (and often more accurate than) the entity's registry properties.
+    if query:
+        kq = await cala.knowledge_query(query)
+        if kq.get("available"):
+            cala_responded = True
+            if kq.get("found"):
+                result.findings.append(Finding(
+                    type="structured_answer", value=kq["results"], source="Cala.ai",
+                    confidence=Confidence.high, notes=f"Cala knowledge/query: {query}",
+                ))
+
+    # ── 2. Resolve the name to a verified entity ──────────────────────────────
+    types = [_TYPE_HINT[entity_type]] if entity_type in _TYPE_HINT else None
     search = await cala.search_entities(name, entity_types=types)
-    if not search.get("available"):
+    if search.get("available"):
+        cala_responded = True
+    top = None
+    if search.get("available") and search.get("found"):
+        candidates = search["entities"]
+        if len(candidates) > 1:
+            result.findings.append(Finding(
+                type="entity_candidates",
+                value=[{"name": e.get("name"), "type": e.get("entity_type"), "id": e.get("id")}
+                       for e in candidates[:10]],
+                source="Cala.ai", confidence=Confidence.medium,
+                notes=f"{len(candidates)} candidates; detailing the top match",
+            ))
+
+        top = candidates[0]
+        entity_id = top.get("id", "")
+        result.findings.append(Finding(
+            type="resolved_entity",
+            value={"name": top.get("name"), "type": top.get("entity_type"),
+                   "id": entity_id, "description": top.get("description")},
+            source="Cala.ai", confidence=Confidence.high,
+        ))
+
+        # ── 3. Pull full sourced detail for the top match ─────────────────────
+        if entity_id:
+            detail = await cala.get_entity(entity_id)
+            if detail.get("available") and detail.get("found"):
+                _record_entity_detail(result, detail["entity"])
+
+    # ── 4. Sourced natural-language summary (context) ─────────────────────────
+    subject = (top.get("name") if top else name) or name
+    etype = top.get("entity_type", "") if top else ""
+    question = f"Provide a due-diligence overview of {subject}"
+    if etype:
+        question += f" ({etype})"
+    ks = await cala.knowledge_search(question)
+    if ks.get("available"):
+        cala_responded = True
+        if ks.get("found"):
+            content = ks["content"]
+            result.findings.append(Finding(
+                type="cala_summary", value=content,
+                source="Cala.ai", confidence=Confidence.high,
+            ))
+            _record_context_sources(result, ks.get("context", []))
+            _flag_risk(result, content)
+
+    # Hard-fail only if Cala never answered (bad key / unreachable).
+    if not cala_responded:
         result.status = TaskStatus.failed
         result.summary = f"Cala unavailable: {search.get('reason') or search.get('error')}"
         result.confidence = Confidence.low
         return result
-    if not search.get("found"):
-        _finalize(result)
-        result.summary = f"Cala found no verified entity matching '{name}'."
-        return result
 
-    candidates = search["entities"]
-    result.sources.append(Source(name="Cala.ai", url="https://www.cala.ai"))
-    if len(candidates) > 1:
-        result.findings.append(Finding(
-            type="entity_candidates",
-            value=[{"name": e.get("name"), "type": e.get("entity_type"), "id": e.get("id")}
-                   for e in candidates[:10]],
-            source="Cala.ai", confidence=Confidence.medium,
-            notes=f"{len(candidates)} candidates; detailing the top match",
-        ))
-
-    top = candidates[0]
-    entity_id = top.get("id", "")
-    result.findings.append(Finding(
-        type="resolved_entity",
-        value={"name": top.get("name"), "type": top.get("entity_type"),
-               "id": entity_id, "description": top.get("description")},
-        source="Cala.ai", confidence=Confidence.high,
-    ))
-
-    # ── 2. Pull full sourced detail for the top match ─────────────────────────
-    if entity_id:
-        detail = await cala.get_entity(entity_id)
-        if detail.get("available") and detail.get("found"):
-            _record_entity_detail(result, detail["entity"])
-
-    # ── 3. Sourced natural-language summary ───────────────────────────────────
-    etype = top.get("entity_type", "")
-    question = f"Provide a due-diligence overview of {top.get('name') or name}"
-    if etype:
-        question += f" ({etype})"
-    ks = await cala.knowledge_search(question)
-    if ks.get("available") and ks.get("found"):
-        content = ks["content"]
-        result.findings.append(Finding(
-            type="cala_summary", value=content,
-            source="Cala.ai", confidence=Confidence.high,
-        ))
-        _record_context_sources(result, ks.get("context", []))
-        _flag_risk(result, content)
+    # Ensure the primary Cala source is present even if only query/summary hit.
+    if not any(s.name == "Cala.ai" for s in result.sources):
+        result.sources.insert(0, Source(name="Cala.ai", url="https://www.cala.ai"))
 
     _finalize(result)
+    if not result.findings:
+        result.summary = f"Cala returned no verified data for '{name}'."
     return result
 
 

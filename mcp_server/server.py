@@ -190,6 +190,16 @@ _TOOLS = [
                     "default": "auto",
                     "description": "Restrict resolution to an entity type, or 'auto' to search all",
                 },
+                "query": {
+                    "type": "string",
+                    "default": "",
+                    "description": "Optional concrete question about the entity, answered with "
+                                   "structured typed rows via Cala knowledge/query. Pass a Cala QL "
+                                   "dot-notation expression (e.g. 'Italdesign Barcelona.employees') "
+                                   "or a natural-language question. Use this whenever the user asks "
+                                   "for a specific attribute (employees, revenue, founders, address) "
+                                   "— it is more accurate than the entity's registry properties.",
+                },
             },
             "required": ["name"],
         },

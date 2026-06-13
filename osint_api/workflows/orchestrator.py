@@ -64,7 +64,7 @@ _WORKFLOWS: dict[str, callable] = {
     "breach_exposure_check": _wrap(breach_workflow.run, "indicator", "indicator_type"),
     "vehicle_recon": _wrap(vehicle_workflow.run, "plate", "country"),
     "secret_scan": _wrap(secret_scan_workflow.run, "target", "scan_type"),
-    "company_recon": _wrap(company_recon_workflow.run, "name", "entity_type"),
+    "company_recon": _wrap(company_recon_workflow.run, "name", "entity_type", "query"),
 }
 
 
