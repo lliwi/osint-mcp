@@ -26,6 +26,12 @@ _RISK_KEYWORDS = (
 
 _MAX_PROPERTY_FINDINGS = 25
 
+# Registry properties that are frequently single-source / stale and conflict with
+# the aggregated knowledge/query answer — surfaced at lower confidence.
+_UNRELIABLE_PROPERTY_KEYS = (
+    "employee", "headcount", "staff", "revenue", "turnover", "capital",
+)
+
 
 async def run(name: str, entity_type: str = "auto", query: str = "") -> OsintResult:
     name = name.strip()
@@ -92,6 +98,20 @@ async def run(name: str, entity_type: str = "auto", query: str = "") -> OsintRes
             if detail.get("available") and detail.get("found"):
                 _record_entity_detail(result, detail["entity"])
 
+        # ── 3b. Auto structured pull when the caller gave no explicit query ───
+        # Guarantees an authoritative, aggregated structured_answer is always
+        # present, instead of relying on the agent to pass `query`.
+        if not query and top.get("name"):
+            akq = await cala.knowledge_query(top["name"])
+            if akq.get("available"):
+                cala_responded = True
+                if akq.get("found"):
+                    result.findings.insert(0, Finding(
+                        type="structured_answer", value=akq["results"], source="Cala.ai",
+                        confidence=Confidence.high,
+                        notes=f"Cala knowledge/query (auto): {top['name']}",
+                    ))
+
     # ── 4. Sourced natural-language summary (context) ─────────────────────────
     subject = (top.get("name") if top else name) or name
     etype = top.get("entity_type", "") if top else ""
@@ -155,9 +175,18 @@ def _record_entity_detail(result: OsintResult, entity: dict) -> None:
             display, src = _extract_sourced(raw)
             if display is None:
                 continue
+            # Single-source registry counts (e.g. employee_count) are often stale
+            # and conflict with the aggregated structured_answer — don't present
+            # them as high confidence.
+            unreliable = any(k in prop.lower() for k in _UNRELIABLE_PROPERTY_KEYS)
+            note = f"source: {src}" if src else ""
+            if unreliable:
+                note = (note + " · " if note else "") + \
+                    "single-source registry figure — see structured_answer for the aggregated value"
             result.findings.append(Finding(
                 type=f"property_{prop}", value=display, source="Cala.ai",
-                confidence=Confidence.high, notes=f"source: {src}" if src else "",
+                confidence=Confidence.medium if unreliable else Confidence.high,
+                notes=note,
             ))
             count += 1
 
