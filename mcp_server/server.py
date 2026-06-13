@@ -172,6 +172,29 @@ _TOOLS = [
         },
     ),
     Tool(
+        name="company_recon",
+        description="Entity due-diligence via Cala.ai verified knowledge. Resolves a company, "
+                    "person, product, law or place name to a verified entity and returns its "
+                    "sourced facts (sector, funding, registry, relationships, metrics) plus a "
+                    "sourced summary. Flags sanctions/PEP/litigation terms. Every fact is traceable.",
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "description": "Entity name to look up, e.g. 'Amenitiz' or 'OpenAI'",
+                },
+                "entity_type": {
+                    "type": "string",
+                    "enum": ["auto", "company", "person", "product", "law", "place", "research"],
+                    "default": "auto",
+                    "description": "Restrict resolution to an entity type, or 'auto' to search all",
+                },
+            },
+            "required": ["name"],
+        },
+    ),
+    Tool(
         name="secret_scan",
         description="Scan an uploaded file/directory or a public git repository "
                     "(github.com, gitlab.com, bitbucket.org, codeberg.org) for leaked "
@@ -338,6 +361,7 @@ async def _dispatch(name: str, args: dict) -> str:
             "breach_exposure_check": "breach_exposure_check",
             "vehicle_recon": "vehicle_recon",
             "secret_scan": "secret_scan",
+            "company_recon": "company_recon",
             "run_osint_workflow": args.get("workflow", ""),
         }
 
@@ -352,6 +376,7 @@ async def _dispatch(name: str, args: dict) -> str:
             "metadata_analysis": "file_path",
             "breach_exposure_check": "indicator",
             "vehicle_recon": "plate",
+            "company_recon": "name",
         }
         target_key = target_key_map.get(name, "target")
         target = args.get(target_key) or args.get("target", "")

@@ -25,7 +25,7 @@ Compatible con **Claude Code**, **Gemini CLI** y **ChatGPT** (mediante GPT Actio
     ├── sherlock, maigret, holehe, phoneinfoga
     ├── exiftool, mat2, pdfinfo, file, strings
     ├── gitleaks, trufflehog, git (clonado de repos)
-    └── Conectores: AbuseIPDB, HIBP, EmailRep, VirusTotal, Shodan
+    └── Conectores: AbuseIPDB, HIBP, EmailRep, VirusTotal, Shodan, Cala.ai
 ```
 
 ---
@@ -45,6 +45,7 @@ Compatible con **Claude Code**, **Gemini CLI** y **ChatGPT** (mediante GPT Actio
 | `breach_exposure_check` | Exposición en brechas conocidas, VirusTotal (sin passwords) |
 | `vehicle_recon` | Matrícula española o VIN → marca, modelo, motor, emisiones, historial ITV |
 | `secret_scan` | Escaneo de secretos/credenciales filtrados en un repositorio git público (github, gitlab, bitbucket, codeberg) o fichero subido, con gitleaks + trufflehog. Secretos siempre redactados |
+| `company_recon` | Due-diligence de entidad vía Cala.ai: resuelve un nombre (empresa, persona, producto, ley, lugar) → ficha verificada con fuentes (sector, funding, registro, relaciones, métricas) + resumen sourced. Marca señales de sanciones/PEP/litigios |
 
 ## Herramientas de soporte MCP
 
@@ -208,6 +209,7 @@ Todas son opcionales. El sistema funciona con las que estén configuradas y degr
 | `FULLCONTACT_API_KEY` | FullContact — enriquecimiento de persona (nombre, empleo, perfiles sociales) | Sí (500 req/mes) | [dashboard.fullcontact.com](https://dashboard.fullcontact.com/) |
 | `INTELX_API_KEY` | Intelligence X — búsqueda en leaks, pastes, darkweb, Telegram | Sí (limitado) | [intelx.io](https://intelx.io/) → Account → API |
 | `PEOPLEDATALABS_API_KEY` | People Data Labs — enriquecimiento de persona: historial laboral, educación, skills, perfiles sociales, dominios email | Sí (100 req/mes free) | [peopledatalabs.com](https://www.peopledatalabs.com/) → API Keys |
+| `CALA_API_KEY` | Cala.ai — conocimiento verificado / due-diligence de entidad: empresas, personas, sanciones/PEP, registros, litigios, con fuentes | Sí (100 créditos/mes) | [console.cala.ai](https://console.cala.ai/) |
 | `SECURITYTRAILS_API_KEY` | SecurityTrails — DNS histórico, subdominios | Sí (50 req/mes) | [securitytrails.com/app/account/credentials](https://securitytrails.com/app/account/credentials) |
 | `TINEYE_API_KEY` | TinEye — búsqueda inversa de imágenes | No (desde $200/mes) | [api.tineye.com](https://api.tineye.com/) |
 | `NUMVERIFY_API_KEY` | Numverify — validación de teléfonos | Sí (100 req/mes) | [numverify.com/dashboard](https://numverify.com/dashboard) |
@@ -233,14 +235,14 @@ Todas son opcionales. El sistema funciona con las que estén configuradas y degr
 ```
 mcp-osint-server/
 ├── mcp_server/         # Servidor MCP (stdio + SSE)
-│   ├── server.py       # Entry point, 15 herramientas MCP
+│   ├── server.py       # Entry point, 16 herramientas MCP
 │   └── schemas/        # Pydantic models compartidos
 ├── osint_api/          # FastAPI backend
 │   ├── main.py
 │   ├── runners/        # Ejecución segura de CLIs
 │   ├── parsers/        # Parsers de output por herramienta
 │   ├── connectors/     # APIs externas (AbuseIPDB, HIBP, etc.)
-│   ├── workflows/      # 11 workflows OSINT
+│   ├── workflows/      # 12 workflows OSINT
 │   ├── catalog/        # Catálogo de herramientas
 │   ├── security/       # Allowlist, validator, sanitizer, rate limiter
 │   └── reports/        # Generadores Markdown/JSON/HTML
@@ -254,7 +256,7 @@ mcp-osint-server/
 
 ## Roadmap
 
-- **Fase 1 (actual):** MVP — 11 workflows, Docker Kali, catálogo, informes, API archivos, long-polling
+- **Fase 1 (actual):** MVP — 12 workflows, Docker Kali, catálogo, informes, API archivos, long-polling
 - **Fase 2:** Autenticación, políticas por rol, cola de tareas, auditoría avanzada
 - **Fase 3:** Correlación de entidades, grafo OSINT, scoring avanzado, STIX/TAXII
 

@@ -362,6 +362,26 @@ tools:
     timeout: 20
     allowed_args: []
 
+  # ── Company / Entity intelligence ──────────────────────────────────────────
+  - name: cala
+    category: company
+    type: api
+    enabled: true
+    requires_api_key: true
+    risk_level: low
+    description: >
+      Cala.ai verified knowledge / entity due-diligence. Resolves a name to a
+      verified entity (company, person, product, law, place) and returns sourced
+      facts — sector, funding, corporate registry, relationships, metrics — plus a
+      sourced natural-language summary. Covers finance, legal, sanctions/PEP and
+      litigation. Every fact traces back to a primary source.
+    inputs: [name, entity_type]
+    outputs: [resolved_entity, description, properties, relationships,
+              numerical_observations, cala_summary, sources]
+    parser: null
+    timeout: 30
+    allowed_args: []
+
   # ── Breach / Leaks ─────────────────────────────────────────────────────────
   - name: gitleaks
     category: breach

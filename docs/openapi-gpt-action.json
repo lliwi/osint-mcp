@@ -361,13 +361,14 @@
               "metadata_analysis",
               "breach_exposure_check",
               "vehicle_recon",
-              "secret_scan"
+              "secret_scan",
+              "company_recon"
             ],
             "description": "The OSINT workflow to execute."
           },
           "target": {
             "type": "string",
-            "description": "Indicator to analyze: domain, IP, email, phone, username, full name, plate, VIN, a file path returned by /files/upload or /files/fetch, or (for secret_scan) a public https git URL (github.com, gitlab.com, bitbucket.org, codeberg.org)."
+            "description": "Indicator to analyze: domain, IP, email, phone, username, full name, plate, VIN, a file path returned by /files/upload or /files/fetch, a public https git URL (secret_scan: github.com, gitlab.com, bitbucket.org, codeberg.org), or an entity name (company_recon: company, person, product, law or place)."
           },
           "mode": {
             "type": "string",
@@ -401,7 +402,7 @@
           },
           "options": {
             "type": "object",
-            "description": "Extra params: depth (domain_recon), country_hint (phone_reputation), indicator_type (breach), platform_scope (username_recon), country (vehicle_recon), scan_type (secret_scan: auto|file|git).",
+            "description": "Extra params: depth (domain_recon), country_hint (phone_reputation), indicator_type (breach), platform_scope (username_recon), country (vehicle_recon), scan_type (secret_scan: auto|file|git), entity_type (company_recon: auto|company|person|product|law|place|research).",
             "additionalProperties": true
           }
         }

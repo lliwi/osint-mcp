@@ -63,6 +63,7 @@ _API_KEY_MAP: dict[str, str] = {
     "intelligencex":               "INTELX_API_KEY",
     "virustotal":                  "VIRUSTOTAL_API_KEY",
     "rapidapi_license_plate_spain":"RAPIDAPI_KEY",
+    "cala":                        "CALA_API_KEY",
     "censys":                      "CENSYS_API_TOKEN",
     "tineye":                      "TINEYE_API_KEY",
     "securitytrails":              "SECURITYTRAILS_API_KEY",
@@ -86,6 +87,7 @@ _LIVE_FIXTURES: dict[str, dict] = {
     # secret_scan auto-detects the git URL and clones + scans with gitleaks + trufflehog.
     # Hello-World is tiny and clean: validates the clone+scan pipeline runs (0 findings expected).
     "secret_scan":      {"workflow": "secret_scan",      "target": "https://github.com/octocat/Hello-World"},
+    "company_recon":    {"workflow": "company_recon",    "target": "OpenAI"},
 }
 
 COLORS = {

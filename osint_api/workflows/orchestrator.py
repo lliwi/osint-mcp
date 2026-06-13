@@ -7,6 +7,7 @@ from mcp_server.schemas.common import OsintResult, WorkflowRequest
 
 from osint_api.workflows import (
     breach_workflow,
+    company_recon_workflow,
     domain_workflow,
     email_workflow,
     image_workflow,
@@ -25,12 +26,13 @@ _TYPE_WORKFLOW_MAP: dict[str, list[str]] = {
     "ip": ["ip_reputation"],
     "email": ["email_reputation", "breach_exposure_check"],
     "phone": ["phone_reputation"],
-    "username": ["username_recon"],
+    "username": ["username_recon", "company_recon"],
     "image": ["reverse_image_search", "metadata_analysis"],
     "file": ["metadata_analysis", "secret_scan"],
     "repo": ["secret_scan"],
     "url": ["breach_exposure_check"],
     "plate": ["vehicle_recon"],
+    "unknown": ["company_recon", "person_recon"],
 }
 
 
@@ -62,6 +64,7 @@ _WORKFLOWS: dict[str, callable] = {
     "breach_exposure_check": _wrap(breach_workflow.run, "indicator", "indicator_type"),
     "vehicle_recon": _wrap(vehicle_workflow.run, "plate", "country"),
     "secret_scan": _wrap(secret_scan_workflow.run, "target", "scan_type"),
+    "company_recon": _wrap(company_recon_workflow.run, "name", "entity_type"),
 }
 
 
