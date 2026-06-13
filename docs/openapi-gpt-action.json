@@ -187,7 +187,7 @@
       "post": {
         "operationId": "runOsintWorkflow",
         "summary": "Launch an OSINT workflow",
-        "description": "Submit an OSINT workflow. Returns task_id; poll GET /tasks/{task_id} until status is completed, failed, or partial.",
+        "description": "Submit an OSINT workflow; poll GET /tasks/{task_id} for the result. company_recon: put only the entity in `target`; if a specific attribute is asked (employees, revenue, founded...), also set top-level `query` to '<entity>.<attribute>'.",
         "requestBody": {
           "required": true,
           "content": {
@@ -368,7 +368,7 @@
           },
           "target": {
             "type": "string",
-            "description": "Indicator to analyze: domain, IP, email, phone, username, full name, plate, VIN, a file path returned by /files/upload or /files/fetch, a public https git URL (secret_scan: github.com, gitlab.com, bitbucket.org, codeberg.org), or an entity name (company_recon: company, person, product, law or place)."
+            "description": "Indicator to analyze: domain, IP, email, phone, username, full name, plate, VIN, a file path returned by /files/upload or /files/fetch, a public https git URL (secret_scan: github.com, gitlab.com, bitbucket.org, codeberg.org), or an entity name (company_recon: company, person, product, law or place). For company_recon put ONLY the entity name here — the specific attribute the user asks about goes in the top-level `query` field, not here."
           },
           "mode": {
             "type": "string",
@@ -400,9 +400,14 @@
             "description": "For person_recon: known phone number.",
             "default": ""
           },
+          "query": {
+            "type": "string",
+            "default": "",
+            "description": "For company_recon ONLY: when the user asks for a SPECIFIC attribute (employees, revenue, founders, address, etc.), set this to a Cala QL dot-notation expression in the form '<entity>.<attribute>', e.g. 'Italdesign Barcelona.employees' or 'OpenAI.founded'. This returns the precise typed value instead of a range. Always populate it whenever the question targets a concrete data point; leave empty for a general overview."
+          },
           "options": {
             "type": "object",
-            "description": "Extra params: depth (domain_recon), country_hint (phone_reputation), indicator_type (breach), platform_scope (username_recon), country (vehicle_recon), scan_type (secret_scan: auto|file|git), entity_type (company_recon: auto|company|person|product|law|place|research), query (company_recon: a Cala QL dot-notation expression like 'Italdesign Barcelona.employees' or a natural-language question to get a precise structured answer — use whenever the user asks for a specific attribute).",
+            "description": "Extra params: depth (domain_recon), country_hint (phone_reputation), indicator_type (breach), platform_scope (username_recon), country (vehicle_recon), scan_type (secret_scan: auto|file|git), entity_type (company_recon: auto|company|person|product|law|place|research).",
             "additionalProperties": true
           }
         }
