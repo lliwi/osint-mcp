@@ -47,6 +47,8 @@ Compatible con **Claude Code**, **Gemini CLI** y **ChatGPT** (mediante GPT Actio
 | `secret_scan` | Escaneo de secretos/credenciales filtrados en un repositorio git público (github, gitlab, bitbucket, codeberg) o fichero subido, con gitleaks + trufflehog. Secretos siempre redactados |
 | `company_recon` | Due-diligence de entidad vía Cala.ai: resuelve un nombre (empresa, persona, producto, ley, lugar) → ficha verificada con fuentes (sector, funding, registro, relaciones, métricas) + resumen sourced. Marca señales de sanciones/PEP/litigios |
 
+> 📖 Ejemplos de consulta para cada workflow (lenguaje natural + payload + curl): [docs/examples.md](docs/examples.md)
+
 ## Herramientas de soporte MCP
 
 | Herramienta | Descripción |
