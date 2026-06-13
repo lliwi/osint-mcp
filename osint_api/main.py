@@ -94,6 +94,16 @@ async def health():
     return {"status": "ok", "mode": os.getenv("OSINT_MODE", "safe")}
 
 
+# ─── Privacy policy (public — required by ChatGPT to publish a GPT) ────────────
+
+@app.get("/privacy", include_in_schema=False)
+@app.get("/privacy.html", include_in_schema=False)
+async def privacy_policy():
+    from fastapi.responses import HTMLResponse
+    from osint_api.privacy import PRIVACY_HTML
+    return HTMLResponse(content=PRIVACY_HTML)
+
+
 # ─── Catalog ──────────────────────────────────────────────────────────────────
 
 @app.get("/tools", dependencies=[Depends(require_api_key)])
