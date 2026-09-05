@@ -11,9 +11,9 @@ Compatible con **Claude Code**, **Gemini CLI** y **ChatGPT** (mediante GPT Actio
 ```
 [Claude Code / Gemini CLI / ChatGPT]
          |
-         | MCP: stdio (local) / HTTP+SSE (remoto)
+         | MCP: stdio (local) / streamable-http · SSE (remoto)
          v
-[mcp_server/server.py]          Python, Anthropic MCP SDK
+[mcp_server/server.py]          Python 3.11+, MCP SDK 2.x
          |
          | HTTP → localhost:8001
          v
@@ -123,14 +123,9 @@ usar el transporte actual, cambia el `command` del servicio `mcp-server` a:
 command: python -m mcp_server.server --transport streamable-http --port 3000
 ```
 
-Ambos transportes HTTP llevan protección anti DNS-rebinding activa. Se acepta
-loopback siempre; cualquier otro nombre por el que se alcance el servidor hay que
-declararlo en `MCP_ALLOWED_HOSTS` (o `--allowed-host`, repetible) o la petición
-se rechaza con `421 Invalid Host header`:
-
-```bash
-MCP_ALLOWED_HOSTS=osint-mcp.playingwith.info docker compose -f docker/docker-compose.yml up -d
-```
+Ambos transportes HTTP llevan protección anti DNS-rebinding activa: sólo se acepta
+loopback salvo que declares otros nombres en `MCP_ALLOWED_HOSTS`
+([detalles](#protección-anti-dns-rebinding)).
 
 ---
 
@@ -186,6 +181,13 @@ pytest tests/ -v
 | `LOG_LEVEL` | Nivel de log: DEBUG, INFO, WARNING, ERROR | `INFO` |
 | `MAX_TASK_TIME_SECONDS` | Timeout máximo por tarea | `300` |
 | `MAX_CONCURRENT_TASKS` | Tareas concurrentes máximas | `3` |
+| `MCP_ALLOWED_HOSTS` | Nombres extra aceptados en la cabecera `Host` por los transportes HTTP, separados por comas ([ver abajo](#protección-anti-dns-rebinding)) | — (sólo loopback) |
+
+> ⚠️ `MCP_ALLOWED_HOSTS` es la única de esta tabla que **no** se lee de `config/.env`:
+> el servicio `mcp-server` del compose no usa `env_file` (así no recibe las API keys
+> de los proveedores OSINT, que no necesita). Defínela en el shell al levantar el
+> compose, en `docker/.env`, o pásala con `--allowed-host` si ejecutas el servidor
+> a mano.
 
 #### Generar `OSINT_INTERNAL_API_KEY`
 
@@ -253,6 +255,30 @@ Todas son opcionales. El sistema funciona con las que estén configuradas y degr
 - **Docker sandbox**: `no-new-privileges`, `cap_drop: ALL`, `read_only`.
 - **Rate limiting** por cliente y por API externa.
 - **Tool poisoning**: resultados de internet se tratan como datos no confiables.
+- **Protección anti DNS-rebinding** siempre activa en los transportes HTTP (ver abajo).
+
+### Protección anti DNS-rebinding
+
+Los transportes `streamable-http` y `sse` validan las cabeceras `Host` y `Origin`
+de cada petición. Se acepta siempre loopback — `127.0.0.1`, `localhost`, `[::1]`,
+con o sin puerto. Cualquier otro nombre por el que se alcance el servidor (un
+dominio, una IP de LAN) hay que declararlo:
+
+```bash
+# vía compose
+MCP_ALLOWED_HOSTS=osint-mcp.playingwith.info docker compose -f docker/docker-compose.yml up -d
+
+# o ejecutando el servidor directamente (repetible)
+python -m mcp_server.server --transport streamable-http --allowed-host osint-mcp.playingwith.info
+```
+
+Una petición con un `Host` no declarado se rechaza con `421 Invalid Host header`,
+y con un `Origin` no declarado con `403 Invalid Origin header`. Al arrancar, el
+servidor registra en el log la lista efectiva de hosts aceptados.
+
+El SDK sólo activa esta protección por su cuenta cuando el proceso escucha en
+loopback; como el contenedor bindea `0.0.0.0`, aquí se configura de forma
+explícita para que aplique en todos los casos.
 
 ---
 
@@ -260,7 +286,7 @@ Todas son opcionales. El sistema funciona con las que estén configuradas y degr
 
 ```
 mcp-osint-server/
-├── mcp_server/         # Servidor MCP (stdio + SSE)
+├── mcp_server/         # Servidor MCP (stdio + streamable-http + SSE)
 │   ├── server.py       # Entry point, 16 herramientas MCP
 │   └── schemas/        # Pydantic models compartidos
 ├── osint_api/          # FastAPI backend
