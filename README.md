@@ -108,6 +108,30 @@ docker compose -f docker/docker-compose.yml up -d
 # MCP Server (SSE) en http://localhost:3000/sse
 ```
 
+El servidor MCP soporta tres transportes:
+
+| `--transport` | Endpoint | Uso |
+|---|---|---|
+| `stdio` (por defecto) | — | Clientes locales: Claude Code, Gemini CLI |
+| `streamable-http` | `http://host:3000/mcp` | Clientes remotos — transporte HTTP actual de la spec MCP |
+| `sse` | `http://host:3000/sse` | Deprecado por la spec MCP; se mantiene por compatibilidad |
+
+`docker-compose.yml` arranca `sse` para no romper clientes ya registrados. Para
+usar el transporte actual, cambia el `command` del servicio `mcp-server` a:
+
+```yaml
+command: python -m mcp_server.server --transport streamable-http --port 3000
+```
+
+Ambos transportes HTTP llevan protección anti DNS-rebinding activa. Se acepta
+loopback siempre; cualquier otro nombre por el que se alcance el servidor hay que
+declararlo en `MCP_ALLOWED_HOSTS` (o `--allowed-host`, repetible) o la petición
+se rechaza con `421 Invalid Host header`:
+
+```bash
+MCP_ALLOWED_HOSTS=osint-mcp.playingwith.info docker compose -f docker/docker-compose.yml up -d
+```
+
 ---
 
 ## Conectar a clientes IA

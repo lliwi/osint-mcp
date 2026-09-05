@@ -63,6 +63,10 @@ services:
       - OSINT_MODE=${OSINT_MODE:-safe}
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - PYTHONUNBUFFERED=1
+      # DNS-rebinding protection: loopback is always accepted. Add any other
+      # name this server is reached under (domain, LAN IP), comma-separated.
+      # Set it in the shell or in docker/.env — config/.env is only read by osint-api.
+      - MCP_ALLOWED_HOSTS=${MCP_ALLOWED_HOSTS:-}
     ports:
       - "127.0.0.1:3000:3000"   # bind to localhost only
     healthcheck:

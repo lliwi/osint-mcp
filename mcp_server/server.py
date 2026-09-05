@@ -15,8 +15,16 @@ import sys
 from typing import Any
 
 import httpx
-from mcp.server import Server
-from mcp.types import CallToolResult, TextContent, Tool
+import jsonschema
+from mcp.server import Server, ServerRequestContext
+from mcp.types import (
+    CallToolRequestParams,
+    CallToolResult,
+    ListToolsResult,
+    PaginatedRequestParams,
+    TextContent,
+    Tool,
+)
 
 logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"), stream=sys.stderr)
 logger = logging.getLogger(__name__)
@@ -24,8 +32,6 @@ logger = logging.getLogger(__name__)
 _API_URL = os.getenv("OSINT_API_URL", "http://localhost:8001")
 _API_KEY = os.getenv("OSINT_INTERNAL_API_KEY", "changeme")
 _HEADERS = {"X-OSINT-API-Key": _API_KEY, "Content-Type": "application/json"}
-
-server = Server("mcp-osint-server", version="0.1.0")
 
 
 # ─── Tool definitions ─────────────────────────────────────────────────────────
@@ -35,7 +41,7 @@ _TOOLS = [
         name="domain_recon",
         description="Passive OSINT reconnaissance for a domain: WHOIS, DNS, subdomains, "
                     "web technologies, certificates and historical URLs.",
-        inputSchema={
+        input_schema={
             "type": "object",
             "properties": {
                 "domain": {"type": "string", "description": "Target domain (e.g. example.com)"},
@@ -50,7 +56,7 @@ _TOOLS = [
         name="ip_reputation",
         description="Analyze a public IP address: ASN, organization, country, abuse reports, "
                     "passive service discovery via Shodan.",
-        inputSchema={
+        input_schema={
             "type": "object",
             "properties": {
                 "ip_address": {"type": "string", "description": "Target IP address (IPv4 or IPv6)"},
@@ -62,7 +68,7 @@ _TOOLS = [
         name="email_reputation",
         description="Analyze an email address: MX records, service registrations (holehe), "
                     "reputation (EmailRep), and breach exposure (HIBP). No login or emails sent.",
-        inputSchema={
+        input_schema={
             "type": "object",
             "properties": {
                 "email": {"type": "string", "description": "Target email address"},
@@ -74,7 +80,7 @@ _TOOLS = [
         name="phone_reputation",
         description="Lookup a phone number: carrier, country, line type, spam signals. "
                     "Public sources only. No calls made.",
-        inputSchema={
+        input_schema={
             "type": "object",
             "properties": {
                 "phone_number": {"type": "string",
@@ -89,7 +95,7 @@ _TOOLS = [
         name="username_recon",
         description="Search for public profiles linked to a username across social networks "
                     "and online services using Sherlock and Maigret.",
-        inputSchema={
+        input_schema={
             "type": "object",
             "properties": {
                 "username": {"type": "string", "description": "Target username / alias"},
@@ -103,7 +109,7 @@ _TOOLS = [
         name="reverse_image_search",
         description="Analyze an uploaded image: extract EXIF metadata, compute hash, "
                     "and optionally search TinEye for reverse matches. No facial recognition.",
-        inputSchema={
+        input_schema={
             "type": "object",
             "properties": {
                 "image_path": {"type": "string",
@@ -118,7 +124,7 @@ _TOOLS = [
         name="metadata_analysis",
         description="Extract and analyze metadata from files (images, PDFs, Office docs): "
                     "hash, file type, EXIF, author, GPS, creation dates, privacy risks.",
-        inputSchema={
+        input_schema={
             "type": "object",
             "properties": {
                 "file_path": {"type": "string",
@@ -131,7 +137,7 @@ _TOOLS = [
         name="breach_exposure_check",
         description="Check if an email, domain, or URL appears in known data breaches or "
                     "malicious intelligence feeds. No passwords are shown.",
-        inputSchema={
+        input_schema={
             "type": "object",
             "properties": {
                 "indicator": {"type": "string", "description": "Email, domain, or URL to check"},
@@ -147,7 +153,7 @@ _TOOLS = [
         description="Look up a Spanish license plate via RapidAPI. Returns brand, model, year, "
                     "color, fuel type, ITV status, insurance and environmental badge. "
                     "Owner data suppressed by default (requires RGPD legal basis).",
-        inputSchema={
+        input_schema={
             "type": "object",
             "properties": {
                 "plate": {
@@ -169,7 +175,7 @@ _TOOLS = [
                     "person, product, law or place name to a verified entity and returns its "
                     "sourced facts (sector, funding, registry, relationships, metrics) plus a "
                     "sourced summary. Flags sanctions/PEP/litigation terms. Every fact is traceable.",
-        inputSchema={
+        input_schema={
             "type": "object",
             "properties": {
                 "name": {
@@ -202,7 +208,7 @@ _TOOLS = [
                     "(github.com, gitlab.com, bitbucket.org, codeberg.org) for leaked "
                     "credentials and secrets using gitleaks and trufflehog. "
                     "Defensive use only — detected secrets are redacted, never shown in full.",
-        inputSchema={
+        input_schema={
             "type": "object",
             "properties": {
                 "target": {
@@ -222,7 +228,7 @@ _TOOLS = [
     Tool(
         name="list_osint_tools",
         description="List available OSINT tools in the catalog, optionally filtered by category.",
-        inputSchema={
+        input_schema={
             "type": "object",
             "properties": {
                 "category": {
@@ -238,7 +244,7 @@ _TOOLS = [
     Tool(
         name="recommend_osint_workflow",
         description="Auto-detect the type of an indicator and recommend which workflows to run.",
-        inputSchema={
+        input_schema={
             "type": "object",
             "properties": {
                 "indicator": {"type": "string",
@@ -250,7 +256,7 @@ _TOOLS = [
     Tool(
         name="run_osint_workflow",
         description="Run any OSINT workflow by name with a target and optional parameters.",
-        inputSchema={
+        input_schema={
             "type": "object",
             "properties": {
                 "workflow": {"type": "string", "description": "Workflow name (e.g. domain_recon)"},
@@ -266,7 +272,7 @@ _TOOLS = [
     Tool(
         name="get_task_result",
         description="Poll the status and result of a previously submitted OSINT task.",
-        inputSchema={
+        input_schema={
             "type": "object",
             "properties": {
                 "task_id": {"type": "string", "description": "Task ID returned by run_osint_workflow"},
@@ -277,7 +283,7 @@ _TOOLS = [
     Tool(
         name="export_report",
         description="Generate and return an OSINT report for a completed task.",
-        inputSchema={
+        input_schema={
             "type": "object",
             "properties": {
                 "task_id": {"type": "string", "description": "Task ID of a completed task"},
@@ -290,24 +296,54 @@ _TOOLS = [
 ]
 
 
-@server.list_tools()
-async def handle_list_tools() -> list[Tool]:
-    return _TOOLS
+_TOOLS_BY_NAME = {t.name: t for t in _TOOLS}
 
 
-@server.call_tool()
-async def handle_call_tool(name: str, arguments: dict[str, Any] | None) -> CallToolResult:
-    args: dict[str, Any] = arguments or {}
+# ─── Request handlers ─────────────────────────────────────────────────────────
+
+def _error(message: str) -> CallToolResult:
+    return CallToolResult(content=[TextContent(type="text", text=message)], is_error=True)
+
+
+async def handle_list_tools(
+    ctx: ServerRequestContext,
+    params: PaginatedRequestParams | None,
+) -> ListToolsResult:
+    return ListToolsResult(tools=_TOOLS)
+
+
+async def handle_call_tool(
+    ctx: ServerRequestContext,
+    params: CallToolRequestParams,
+) -> CallToolResult:
+    name = params.name
+    args: dict[str, Any] = params.arguments or {}
+
+    tool = _TOOLS_BY_NAME.get(name)
+    if tool is None:
+        return _error(f"Error: unknown tool '{name}'")
+
+    # The low-level server validates the JSON-RPC envelope, not the tool
+    # arguments against inputSchema — that is on us.
+    try:
+        jsonschema.validate(instance=args, schema=tool.input_schema)
+    except jsonschema.ValidationError as exc:
+        return _error(f"Input validation error: {exc.message}")
 
     try:
         result = await _dispatch(name, args)
         return CallToolResult(content=[TextContent(type="text", text=result)])
     except Exception as exc:
         logger.exception("Tool '%s' error", name)
-        return CallToolResult(
-            content=[TextContent(type="text", text=f"Error: {exc}")],
-            isError=True,
-        )
+        return _error(f"Error: {exc}")
+
+
+server = Server(
+    "mcp-osint-server",
+    version="0.1.0",
+    on_list_tools=handle_list_tools,
+    on_call_tool=handle_call_tool,
+)
 
 
 async def _dispatch(name: str, args: dict) -> str:
@@ -422,14 +458,82 @@ async def _dispatch(name: str, args: dict) -> str:
 
 # ─── Entry point ──────────────────────────────────────────────────────────────
 
+_LOOPBACK_HOSTS = ("127.0.0.1", "localhost", "[::1]")
+
+
+def _transport_security(extra_hosts: list[str]):
+    """DNS-rebinding protection for the HTTP transports — always on.
+
+    The SDK only enables this by itself when the app is bound to a loopback
+    address, so binding 0.0.0.0 (what the container does) would silently leave it
+    off. We build the settings explicitly instead. Loopback is always accepted;
+    any other name the server is reached under — a domain, a LAN IP — has to be
+    declared, or the request is rejected with 421.
+    """
+    from mcp.server.transport_security import TransportSecuritySettings
+
+    hosts: list[str] = []
+    for host in (*_LOOPBACK_HOSTS, *extra_hosts):
+        if host and host not in hosts:
+            hosts.append(host)
+
+    allowed_hosts: list[str] = []
+    allowed_origins: list[str] = []
+    for host in hosts:
+        # Bare entry matches a portless Host header, ":*" matches any port.
+        allowed_hosts += [host, f"{host}:*"]
+        allowed_origins += [f"{scheme}://{host}{port}"
+                            for scheme in ("http", "https") for port in ("", ":*")]
+
+    logger.info("DNS-rebinding protection enabled; accepted Host values: %s",
+                ", ".join(allowed_hosts))
+    return TransportSecuritySettings(
+        enable_dns_rebinding_protection=True,
+        allowed_hosts=allowed_hosts,
+        allowed_origins=allowed_origins,
+    )
+
+
+def _health_route(transport: str):
+    """/health route for the HTTP transports — used by the container healthcheck."""
+    from starlette.responses import JSONResponse
+    from starlette.routing import Route
+
+    async def handle_health(request):
+        return JSONResponse({"status": "ok", "transport": transport})
+
+    return Route("/health", endpoint=handle_health)
+
+
+def _silence_health_access_logs() -> None:
+    """Keep the access log readable — /health is polled every few seconds."""
+
+    class _HealthFilter(logging.Filter):
+        def filter(self, record: logging.LogRecord) -> bool:
+            return "GET /health" not in record.getMessage()
+
+    logging.getLogger("uvicorn.access").addFilter(_HealthFilter())
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="MCP OSINT Server")
-    parser.add_argument("--transport", choices=["stdio", "sse"], default="stdio")
+    parser.add_argument("--transport", choices=["stdio", "sse", "streamable-http"],
+                        default="stdio",
+                        help="stdio for local clients; streamable-http for remote clients "
+                             "(sse is deprecated by the MCP spec, kept for compatibility)")
     parser.add_argument("--port", type=int, default=3000,
-                        help="Port for SSE transport (default: 3000)")
+                        help="Port for the HTTP transports (default: 3000)")
     parser.add_argument("--host", default="0.0.0.0",
-                        help="Host for SSE transport (default: 0.0.0.0)")
+                        help="Bind host for the HTTP transports (default: 0.0.0.0)")
+    parser.add_argument("--allowed-host", action="append", metavar="HOST",
+                        help="Extra Host header value the HTTP transports accept, e.g. "
+                             "osint.example.com (repeatable). Loopback is always accepted. "
+                             "Defaults to $MCP_ALLOWED_HOSTS (comma-separated).")
     args = parser.parse_args()
+
+    extra_hosts = args.allowed_host or [
+        h.strip() for h in os.getenv("MCP_ALLOWED_HOSTS", "").split(",") if h.strip()
+    ]
 
     if args.transport == "stdio":
         import asyncio
@@ -451,7 +555,9 @@ def main() -> None:
         from starlette.responses import Response
         from starlette.routing import Mount, Route
 
-        sse_transport = SseServerTransport("/messages/")
+        sse_transport = SseServerTransport(
+            "/messages/", security_settings=_transport_security(extra_hosts)
+        )
 
         async def handle_sse(request):
             async with sse_transport.connect_sse(
@@ -465,26 +571,35 @@ def main() -> None:
             # stream is already finished at this point.
             return Response()
 
-        async def handle_health(request):
-            from starlette.responses import JSONResponse
-            return JSONResponse({"status": "ok", "transport": "sse"})
-
         starlette_app = Starlette(
             routes=[
-                Route("/health", endpoint=handle_health),
+                _health_route("sse"),
                 Route("/sse", endpoint=handle_sse),
                 Mount("/messages/", app=sse_transport.handle_post_message),
             ]
         )
 
-        # Suppress /health spam from SSE keep-alive polling in access logs
-        import logging as _logging
-        class _HealthFilter(_logging.Filter):
-            def filter(self, record: _logging.LogRecord) -> bool:
-                return "GET /health" not in record.getMessage()
-        _logging.getLogger("uvicorn.access").addFilter(_HealthFilter())
+        _silence_health_access_logs()
 
+        logger.warning("The SSE transport is deprecated by the MCP spec; "
+                       "prefer --transport streamable-http for new clients.")
         logger.info("MCP OSINT Server (SSE) starting on %s:%s", args.host, args.port)
+        uvicorn.run(starlette_app, host=args.host, port=args.port)
+
+    elif args.transport == "streamable-http":
+        import uvicorn
+
+        # streamable_http_app() wires the session manager into the app lifespan.
+        starlette_app = server.streamable_http_app(
+            streamable_http_path="/mcp",
+            transport_security=_transport_security(extra_hosts),
+            custom_starlette_routes=[_health_route("streamable-http")],
+        )
+
+        _silence_health_access_logs()
+
+        logger.info("MCP OSINT Server (streamable-http) starting on %s:%s/mcp",
+                    args.host, args.port)
         uvicorn.run(starlette_app, host=args.host, port=args.port)
 
 

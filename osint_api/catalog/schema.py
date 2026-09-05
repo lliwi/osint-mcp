@@ -14,7 +14,7 @@ class ToolEntry(BaseModel):
     description: str = ""
     inputs: list[str] = Field(default_factory=list)
     outputs: list[str] = Field(default_factory=list)
-    parser: str = ""
+    parser: str | None = None
     timeout: int = 60
     allowed_args: list[str] = Field(default_factory=list)
     source: str = "local"

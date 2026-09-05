@@ -60,9 +60,34 @@ Ejecuta `/mcp` en Claude Code para verificar que el servidor `osint` aparece dis
 
 ---
 
-## Opción B — Conexión remota (HTTP/SSE)
+## Opción B — Conexión remota (HTTP)
 
 Usa esta opción si el servidor corre en Docker o en un host remoto.
+
+El servidor expone dos transportes HTTP: `streamable-http` (el actual de la spec
+MCP, en `/mcp`) y `sse` (deprecado, en `/sse`). `docker-compose.yml` arranca
+`sse` por defecto; para el transporte actual cambia el `command` del servicio
+`mcp-server` a `--transport streamable-http` y registra la URL `/mcp`:
+
+```json
+{
+  "mcpServers": {
+    "osint": {
+      "url": "http://localhost:3000/mcp"
+    }
+  }
+}
+```
+
+Si accedes al servidor por un dominio o IP de LAN en lugar de `localhost`,
+declara ese nombre en `MCP_ALLOWED_HOSTS` al levantar el compose — si no, la
+protección anti DNS-rebinding rechaza la conexión con `421 Invalid Host header`:
+
+```bash
+MCP_ALLOWED_HOSTS=osint.example.com docker compose -f docker/docker-compose.yml up -d
+```
+
+El resto de esta sección describe la variante SSE.
 
 ### 1. Levantar con Docker Compose
 
