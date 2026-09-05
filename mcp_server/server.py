@@ -16,15 +16,7 @@ from typing import Any
 
 import httpx
 from mcp.server import Server
-from mcp.server.models import InitializationOptions
-from mcp.types import (
-    CallToolRequest,
-    CallToolResult,
-    ListToolsRequest,
-    ListToolsResult,
-    TextContent,
-    Tool,
-)
+from mcp.types import CallToolResult, TextContent, Tool
 
 logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"), stream=sys.stderr)
 logger = logging.getLogger(__name__)
@@ -33,7 +25,7 @@ _API_URL = os.getenv("OSINT_API_URL", "http://localhost:8001")
 _API_KEY = os.getenv("OSINT_INTERNAL_API_KEY", "changeme")
 _HEADERS = {"X-OSINT-API-Key": _API_KEY, "Content-Type": "application/json"}
 
-server = Server("mcp-osint-server")
+server = Server("mcp-osint-server", version="0.1.0")
 
 
 # ─── Tool definitions ─────────────────────────────────────────────────────────
@@ -299,14 +291,13 @@ _TOOLS = [
 
 
 @server.list_tools()
-async def handle_list_tools(_: ListToolsRequest) -> ListToolsResult:
-    return ListToolsResult(tools=_TOOLS)
+async def handle_list_tools() -> list[Tool]:
+    return _TOOLS
 
 
 @server.call_tool()
-async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
-    name = request.params.name
-    args: dict[str, Any] = request.params.arguments or {}
+async def handle_call_tool(name: str, arguments: dict[str, Any] | None) -> CallToolResult:
+    args: dict[str, Any] = arguments or {}
 
     try:
         result = await _dispatch(name, args)
@@ -448,14 +439,7 @@ def main() -> None:
             async with stdio_server() as (read, write):
                 await server.run(
                     read, write,
-                    InitializationOptions(
-                        server_name="mcp-osint-server",
-                        server_version="0.1.0",
-                        capabilities=server.get_capabilities(
-                            notification_options=None,
-                            experimental_capabilities={},
-                        ),
-                    ),
+                    server.create_initialization_options(),
                 )
 
         asyncio.run(_run_stdio())
@@ -464,9 +448,10 @@ def main() -> None:
         import uvicorn
         from mcp.server.sse import SseServerTransport
         from starlette.applications import Starlette
+        from starlette.responses import Response
         from starlette.routing import Mount, Route
 
-        sse_transport = SseServerTransport("/messages")
+        sse_transport = SseServerTransport("/messages/")
 
         async def handle_sse(request):
             async with sse_transport.connect_sse(
@@ -474,15 +459,11 @@ def main() -> None:
             ) as (read, write):
                 await server.run(
                     read, write,
-                    InitializationOptions(
-                        server_name="mcp-osint-server",
-                        server_version="0.1.0",
-                        capabilities=server.get_capabilities(
-                            notification_options=None,
-                            experimental_capabilities={},
-                        ),
-                    ),
+                    server.create_initialization_options(),
                 )
+            # Starlette requires an ASGI response from a Route endpoint; the SSE
+            # stream is already finished at this point.
+            return Response()
 
         async def handle_health(request):
             from starlette.responses import JSONResponse
@@ -492,7 +473,7 @@ def main() -> None:
             routes=[
                 Route("/health", endpoint=handle_health),
                 Route("/sse", endpoint=handle_sse),
-                Mount("/messages", app=sse_transport.handle_post_message),
+                Mount("/messages/", app=sse_transport.handle_post_message),
             ]
         )
 

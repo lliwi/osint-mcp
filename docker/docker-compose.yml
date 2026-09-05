@@ -7,6 +7,9 @@ services:
       dockerfile: docker/Dockerfile.kali
     command: uvicorn osint_api.main:app --host 0.0.0.0 --port 8001
     restart: unless-stopped
+    labels:
+      # Imagen construida en local: watchtower no debe intentar pull del registry
+      com.centurylinklabs.watchtower.enable: "false"
     security_opt:
       - no-new-privileges:true
     cap_drop:
@@ -38,6 +41,9 @@ services:
       dockerfile: docker/Dockerfile.kali
     command: python -m mcp_server.server --transport sse --port 3000
     restart: unless-stopped
+    labels:
+      # Imagen construida en local: watchtower no debe intentar pull del registry
+      com.centurylinklabs.watchtower.enable: "false"
     depends_on:
       osint-api:
         condition: service_healthy
